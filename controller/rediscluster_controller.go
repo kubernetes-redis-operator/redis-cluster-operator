@@ -25,7 +25,7 @@ import (
 	"github.com/serdarkalayci/redis-cluster-operator/internal/kubernetes"
 	redis_internal "github.com/serdarkalayci/redis-cluster-operator/internal/redis"
 	"github.com/serdarkalayci/redis-cluster-operator/internal/utils"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
@@ -66,7 +66,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	err := r.Client.Get(ctx, req.NamespacedName, redisCluster)
 
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// The RedisCluster resource is not found on the cluster. Probably deleted by the user before this reconciliation. We'll quit early.
 			logger.Info("RedisCluster not found during reconcile. Probably deleted by user. Exiting early.")
 			return ctrl.Result{}, nil
@@ -76,14 +76,14 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	//region Try to get the ConfigMap for the RedisCluster
 	configMap, err := kubernetes.FetchConfigmap(ctx, r.Client, redisCluster)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		// This is a legitimate error, we should log the error and exit early, requeuing the reconciliation
 		logger.Error(err, "error checking the existence of ConfigMap")
 		return ctrl.Result{
 			RequeueAfter: 30 * time.Second,
 		}, err
 	}
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		// We successfully checked but the ConfigMap does not exist. We need to create it.
 		configMap, err = kubernetes.CreateConfigMap(ctx, r.Client, redisCluster)
 		if err != nil {
@@ -136,7 +136,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	//region Ensure Statefulset
 	statefulsets, err := kubernetes.FetchExistingStatefulsets(ctx, r.Client, redisCluster)
-	if (err != nil && !errors.IsNotFound(err)) || len(statefulsets) != int(redisCluster.Spec.ReplicasPerMaster+1) {
+	if (err != nil && !apierrors.IsNotFound(err)) || len(statefulsets) != int(redisCluster.Spec.ReplicasPerMaster+1) {
 		// We've got a legitimate error, we should log the error and exit early
 		logger.Error(err, "Could not check whether statefulset exists due to error.")
 		return ctrl.Result{
@@ -144,7 +144,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}, err
 	}
 
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		// We need to create the Statefulset
 		statefulsets, err = kubernetes.CreateStatefulsets(ctx, r.Client, redisCluster)
 		if err != nil {
@@ -197,14 +197,14 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	//region Ensure Service
 	service, err := kubernetes.FetchService(ctx, r.Client, redisCluster)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		// We've got a legitimate error, we should log the error and exit early
 		logger.Error(err, "Could not check whether service exists due to error.")
 		return ctrl.Result{
 			RequeueAfter: 30 * time.Second,
 		}, err
 	}
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		// We need to create the Statefulset
 		service, err = kubernetes.CreateService(ctx, r.Client, redisCluster)
 		if err != nil {

@@ -6,11 +6,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	cachev1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -53,7 +53,7 @@ func TestFetchExistingStatefulSetReturnsErrorIfNotFound(t *testing.T) {
 
 	_, err := FetchExistingStatefulsets(context.TODO(), client, cluster)
 	assert.Error(t, err)
-	assert.EqualError(t, err, "error fetching statefulsets")
+	assert.True(t, apierrors.IsNotFound(err))
 }
 
 func TestFetchExistingStatefulSetReturnsErrorIfReplicaNotFound(t *testing.T) {
@@ -78,7 +78,7 @@ func TestFetchExistingStatefulSetReturnsErrorIfReplicaNotFound(t *testing.T) {
 
 	_, err := FetchExistingStatefulsets(context.TODO(), client, cluster)
 	assert.Error(t, err)
-	assert.EqualError(t, err, "error fetching statefulsets")
+	assert.True(t, apierrors.IsNotFound(err))
 }
 
 func TestFetchExistingStatefulSetReturnsStatefulsetIfFound(t *testing.T) {
