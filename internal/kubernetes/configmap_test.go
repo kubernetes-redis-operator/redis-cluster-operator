@@ -31,7 +31,7 @@ func TestGetDefaultRedisConfig(t *testing.T) {
 
 //endregion
 
-// region FetchExistingConfigMap
+// region FetchConfigmap
 func TestFindExistingConfigMapFetchesConfigMap(t *testing.T) {
 	// Register operator types with the runtime scheme.
 	s := scheme.Scheme
@@ -54,7 +54,7 @@ func TestFindExistingConfigMapFetchesConfigMap(t *testing.T) {
 		},
 	}
 
-	configMap, err := FetchExistingConfigMap(context.TODO(), client, cluster)
+	configMap, err := FetchConfigmap(context.TODO(), client, cluster)
 	if err != nil {
 		t.Fatalf("Expected ConfigMap to be found, but received an error %v", err)
 	}
@@ -95,7 +95,7 @@ func TestFindExistingConfigMapFetchesCorrectConfigMap(t *testing.T) {
 		},
 	}
 
-	configMap, err := FetchExistingConfigMap(context.TODO(), client, cluster)
+	configMap, err := FetchConfigmap(context.TODO(), client, cluster)
 	if err != nil {
 		t.Fatalf("Expected ConfigMap to be found, but received an error %v", err)
 	}
@@ -118,7 +118,7 @@ func TestFindExistingConfigMapReturnsNotFoundErrorIfNotExists(t *testing.T) {
 		},
 	}
 
-	_, err := FetchExistingConfigMap(context.TODO(), client, cluster)
+	_, err := FetchConfigmap(context.TODO(), client, cluster)
 	if err == nil {
 		t.Fatalf("Expected not found error but did not receive any error")
 	}
@@ -224,7 +224,7 @@ func TestCreateConfigMapSpecShouldHaveRedisConfKey(t *testing.T) {
 		t.Fatalf("ConfigMap generated with incorrect name or namespace. Name %s Namespace %s", configMap.Name, configMap.Namespace)
 	}
 	if _, ok := configMap.Data["redis.conf"]; !ok {
-		t.Fatalf("The redis.conf key does not exist on the generated configmap")
+		t.Fatalf("The redis.conf key does not exist on the generated ConfigMap")
 	}
 }
 
@@ -249,7 +249,7 @@ func TestCreateConfigMap(t *testing.T) {
 	client := clientBuilder.Build()
 	_, err := CreateConfigMap(context.TODO(), client, &redisCluster)
 	if err != nil {
-		t.Fatalf("Received an error while trying to create Redis configmap")
+		t.Fatalf("Received an error while trying to create Redis ConfigMap")
 	}
 
 	// Assert that the kubeClient contains the new configMap
@@ -259,7 +259,7 @@ func TestCreateConfigMap(t *testing.T) {
 		Name:      getConfigMapName(&redisCluster),
 	}, configMap)
 	if err != nil {
-		t.Fatalf("Received an error while trying to assert created configmap %v", err)
+		t.Fatalf("Received an error while trying to assert created ConfigMap %v", err)
 	}
 }
 

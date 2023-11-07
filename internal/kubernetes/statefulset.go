@@ -2,11 +2,13 @@ package kubernetes
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
 	"github.com/serdarkalayci/redis-cluster-operator/internal/utils"
-	v1 "k8s.io/api/apps/v1"
-	v12 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -14,8 +16,8 @@ import (
 )
 
 const (
-	RedisNodeNameStatefulsetLabel = "redis.kuro.io/cluster-name"
-	RedisNodeComponentLabel       = "redis.kuro.io/cluster-component"
+	RedisNodeNameStatefulsetLabel = "cache.serdarkalayci.com/cluster-name"
+	RedisNodeComponentLabel       = "cache.serdarkalayci.com/cluster-component"
 )
 
 func GetStatefulSetLabels(cluster *v1alpha1.RedisCluster) labels.Set {
@@ -31,44 +33,104 @@ func GetPodLabels(cluster *v1alpha1.RedisCluster) labels.Set {
 	}
 }
 
-func FetchExistingStatefulset(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*v1.StatefulSet, error) {
-	statefulset := &v1.StatefulSet{}
+func FetchExistingStatefulsets(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) ([]*appsv1.StatefulSet, error) {
+	var errslice []error
+	var statefulsets []*appsv1.StatefulSet
+	masterss := &appsv1.StatefulSet{}
 	err := kubeClient.Get(ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
-		Name:      cluster.Name,
-	}, statefulset)
-	return statefulset, err
+		Name:      cluster.Name + "-master",
+	}, masterss)
+	if err != nil {
+		errslice = append(errslice, err)
+	}
+	statefulsets = append(statefulsets, masterss)
+	for i := 0; i < int(cluster.Spec.ReplicasPerMaster); i++ {
+		replss := &appsv1.StatefulSet{}
+		err := kubeClient.Get(ctx, types.NamespacedName{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name + fmt.Sprintf("-repl-%d", i),
+		}, replss)
+		if err != nil {
+			errslice = append(errslice, err)
+		}
+		statefulsets = append(statefulsets, replss)
+	}
+	if len(errslice) > 0 {
+		creationError := fmt.Errorf("error fetching statefulsets")
+		for i := 0; i < len(errslice); i++ {
+			errors.Wrap(creationError, errslice[i].Error())
+		}
+		return nil, creationError
+	}
+	return statefulsets, err
 }
 
-func createStatefulsetSpec(cluster *v1alpha1.RedisCluster) *v1.StatefulSet {
-	replicasNeeded := cluster.NodesNeeded()
-	statefulset := &v1.StatefulSet{
+func CreateStatefulsets(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) ([]*appsv1.StatefulSet, error) {
+	var errslice []error
+	var statefulsets []*appsv1.StatefulSet
+	masterss := createStatefulsetSpec(cluster, "master")
+	err := kubeClient.Create(ctx, masterss)
+	if err != nil {
+		errslice = append(errslice, err)
+		return nil, err
+	}
+	statefulsets = append(statefulsets, masterss) // Append to the list after creating and having no error just because we know what to clean up in case of an error later on
+	for i := 0; i < int(cluster.Spec.ReplicasPerMaster) && len(errslice) == 0; i++ {
+		replss := createStatefulsetSpec(cluster, fmt.Sprintf("repl-%d", i))
+		err := kubeClient.Create(ctx, replss)
+		if err != nil {
+			errslice = append(errslice, err)
+			break
+		}
+		statefulsets = append(statefulsets, replss)
+	}
+	// At this point, we may have some statefulsets created and some not. We need to clean up the ones that are created if stop is true
+	if len(errslice) > 0 {
+		creationError := fmt.Errorf("error creating statefulsets")
+		for i := 0; i < len(errslice); i++ {
+			errors.Wrap(creationError, errslice[i].Error())
+		}
+		for _, statefulset := range statefulsets {
+			err := kubeClient.Delete(ctx, statefulset)
+			if err != nil {
+				errors.Wrap(creationError, err.Error())
+			}
+		}
+		return nil, creationError
+	}
+	return statefulsets, nil
+}
+
+func createStatefulsetSpec(cluster *v1alpha1.RedisCluster, namesuffix string) *appsv1.StatefulSet {
+	replicasNeeded := cluster.Spec.ReplicasPerMaster
+	statefulset := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.Name,
+			Name:      cluster.Name + "-" + namesuffix,
 			Namespace: cluster.Namespace,
 			Labels:    GetStatefulSetLabels(cluster),
 		},
-		Spec: v1.StatefulSetSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicasNeeded,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: GetPodLabels(cluster),
 			},
-			PodManagementPolicy: v1.ParallelPodManagement,
-			Template: v12.PodTemplateSpec{
+			PodManagementPolicy: appsv1.ParallelPodManagement,
+			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: GetPodLabels(cluster),
 					Annotations: map[string]string{
 						"kubectl.kubernetes.io/default-container": "redis",
 					},
 				},
-				Spec: v12.PodSpec{
+				Spec: corev1.PodSpec{
 					Volumes: utils.MergeVolumes(
-						[]v12.Volume{
+						[]corev1.Volume{
 							{
 								Name: "redis-cluster-config",
-								VolumeSource: v12.VolumeSource{
-									ConfigMap: &v12.ConfigMapVolumeSource{
-										LocalObjectReference: v12.LocalObjectReference{
+								VolumeSource: corev1.VolumeSource{
+									ConfigMap: &corev1.ConfigMapVolumeSource{
+										LocalObjectReference: corev1.LocalObjectReference{
 											Name: getConfigMapName(cluster),
 										},
 									},
@@ -78,11 +140,11 @@ func createStatefulsetSpec(cluster *v1alpha1.RedisCluster) *v1.StatefulSet {
 						cluster.Spec.PodSpec.Volumes,
 					),
 					InitContainers: utils.MergeContainers(
-						[]v12.Container{},
+						[]corev1.Container{},
 						cluster.Spec.PodSpec.InitContainers,
 					),
 					Containers: utils.MergeContainers(
-						[]v12.Container{
+						[]corev1.Container{
 							{
 								Name:  "redis",
 								Image: "redis:7.0.0",
@@ -92,7 +154,7 @@ func createStatefulsetSpec(cluster *v1alpha1.RedisCluster) *v1.StatefulSet {
 								Args: []string{
 									"/usr/local/etc/redis/redis.conf",
 								},
-								Ports: []v12.ContainerPort{
+								Ports: []corev1.ContainerPort{
 									{
 										Name:          "redis",
 										ContainerPort: 6379,
@@ -102,9 +164,9 @@ func createStatefulsetSpec(cluster *v1alpha1.RedisCluster) *v1.StatefulSet {
 										ContainerPort: 16379,
 									},
 								},
-								LivenessProbe: &v12.Probe{
-									ProbeHandler: v12.ProbeHandler{
-										Exec: &v12.ExecAction{
+								LivenessProbe: &corev1.Probe{
+									ProbeHandler: corev1.ProbeHandler{
+										Exec: &corev1.ExecAction{
 											Command: []string{
 												"redis-cli",
 												"ping",
@@ -115,9 +177,9 @@ func createStatefulsetSpec(cluster *v1alpha1.RedisCluster) *v1.StatefulSet {
 									TimeoutSeconds:      5,
 									PeriodSeconds:       3,
 								},
-								ReadinessProbe: &v12.Probe{
-									ProbeHandler: v12.ProbeHandler{
-										Exec: &v12.ExecAction{
+								ReadinessProbe: &corev1.Probe{
+									ProbeHandler: corev1.ProbeHandler{
+										Exec: &corev1.ExecAction{
 											Command: []string{
 												"redis-cli",
 												"ping",
@@ -128,7 +190,7 @@ func createStatefulsetSpec(cluster *v1alpha1.RedisCluster) *v1.StatefulSet {
 									TimeoutSeconds:      5,
 									PeriodSeconds:       3,
 								},
-								VolumeMounts: []v12.VolumeMount{
+								VolumeMounts: []corev1.VolumeMount{
 									{
 										Name:      "redis-cluster-config",
 										MountPath: "/usr/local/etc/redis",
@@ -175,10 +237,4 @@ func createStatefulsetSpec(cluster *v1alpha1.RedisCluster) *v1.StatefulSet {
 		},
 	}
 	return statefulset
-}
-
-func CreateStatefulset(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*v1.StatefulSet, error) {
-	statefulset := createStatefulsetSpec(cluster)
-	err := kubeClient.Create(ctx, statefulset)
-	return statefulset, err
 }

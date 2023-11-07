@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// region FetchExistingConfigMap
+// region FetchConfigmap
 func TestFindExistingService(t *testing.T) {
 	// Register operator types with the runtime scheme.
 	s := scheme.Scheme
@@ -38,7 +38,7 @@ func TestFindExistingService(t *testing.T) {
 		},
 	}
 
-	service, err := FetchExistingService(context.TODO(), client, cluster)
+	service, err := FetchService(context.TODO(), client, cluster)
 	if err != nil {
 		t.Fatalf("Expected Service to be found, but received an error %v", err)
 	}
@@ -79,7 +79,7 @@ func TestFindExistingServiceFetchesCorrectService(t *testing.T) {
 		},
 	}
 
-	service, err := FetchExistingService(context.TODO(), client, cluster)
+	service, err := FetchService(context.TODO(), client, cluster)
 	if err != nil {
 		t.Fatalf("Expected Service to be found, but received an error %v", err)
 	}
@@ -102,7 +102,7 @@ func TestFindExistingServiceReturnsNotFoundErrorIfNotExists(t *testing.T) {
 		},
 	}
 
-	_, err := FetchExistingService(context.TODO(), client, cluster)
+	_, err := FetchService(context.TODO(), client, cluster)
 	if err == nil {
 		t.Fatalf("Expected not found error but did not receive any error")
 	}

@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func FetchExistingService(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*v1.Service, error) {
+func FetchService(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*v1.Service, error) {
 	service := &v1.Service{}
 	err := kubeClient.Get(ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
