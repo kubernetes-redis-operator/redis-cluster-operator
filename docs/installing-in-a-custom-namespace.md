@@ -9,7 +9,7 @@ REDIS_CLUSTER_OPERATOR_HOME=$(mktemp -d)
 cat <<EOF >$REDIS_CLUSTER_OPERATOR_HOME/kustomization.yaml
 namespace: custom-namespace
 bases:
-  - https://github.com/ContainerSolutions/redis-cluster-operator/releases/latest/download/bundle.yml
+  - https://github.com/serdarkalayci/redis-cluster-operator/releases/latest/download/bundle.yml
   EOF
 ```
 

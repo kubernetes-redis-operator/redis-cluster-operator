@@ -2,13 +2,14 @@ package kubernetes
 
 import (
 	"context"
-	cachev1alpha1 "github.com/containersolutions/redis-cluster-operator/api/v1alpha1"
+	"testing"
+
+	cachev1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
 )
 
 // region FetchRedisPods

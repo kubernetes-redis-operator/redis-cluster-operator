@@ -3,12 +3,13 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"github.com/containersolutions/redis-cluster-operator/api/v1alpha1"
+	"strings"
+
+	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 func FetchExistingConfigMap(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*v1.ConfigMap, error) {

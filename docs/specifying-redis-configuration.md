@@ -7,7 +7,7 @@ When the Operator creates a cluster, it also creates a configmap which holds the
 The configuration for Redis Nodes can be specified through the `config` key in the Redis CRD.
 
 ```yaml
-apiVersion: cache.container-solutions.com/v1alpha1
+apiVersion: redis.kuro.io/v1alpha1
 kind: RedisCluster
 metadata:
   name: rediscluster-sample

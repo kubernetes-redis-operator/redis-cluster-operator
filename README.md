@@ -40,7 +40,7 @@ The origin bundle works in cluster mode, and will manage all RedisClusters creat
 
 To install or upgrade the operator 
 ```shell
-kubectl apply -f https://github.com/ContainerSolutions/redis-cluster-operator/releases/latest/download/bundle.yml
+kubectl apply -f https://github.com/serdarkalayci/redis-cluster-operator/releases/latest/download/bundle.yml
 ```
 
 This will install the Operator in a new namespace `redis-cluster-operator`. 
@@ -67,7 +67,7 @@ The Operator will support Namespaced mode in the future.
 To create your first Redis cluster, you'll need a CRD.
 
 ```yaml
-apiVersion: cache.container-solutions.com/v1alpha1
+apiVersion: redis.kuro.io/v1alpha1
 kind: RedisCluster
 metadata:
   name: rediscluster-product-api

@@ -3,11 +3,12 @@ package redis
 import (
 	"context"
 	"errors"
-	"github.com/containersolutions/redis-cluster-operator/api/v1alpha1"
-	"github.com/go-redis/redis/v8"
-	v1 "k8s.io/api/core/v1"
 	"strconv"
 	"strings"
+
+	"github.com/go-redis/redis/v8"
+	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (

@@ -2,19 +2,20 @@ package kubernetes
 
 import (
 	"context"
-	cachev1alpha1 "github.com/containersolutions/redis-cluster-operator/api/v1alpha1"
+	"reflect"
+	"strings"
+	"testing"
+
+	cachev1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"strings"
-	"testing"
 )
 
-//region getDefaultRedisConfig
+// region getDefaultRedisConfig
 func TestGetDefaultRedisConfig(t *testing.T) {
 	defaultConfig := getDefaultRedisConfig()
 
@@ -128,7 +129,7 @@ func TestFindExistingConfigMapReturnsNotFoundErrorIfNotExists(t *testing.T) {
 
 // endregion
 
-//region getRedisConfigAsMultilineYaml
+// region getRedisConfigAsMultilineYaml
 func TestGetRedisConfigAsMultilineYaml(t *testing.T) {
 	got := getRedisConfigAsMultilineYaml(map[string]string{
 		"cluster-enabled": "true",
@@ -153,7 +154,7 @@ cluster-enabled true
 
 //endregion
 
-//region getAppliedRedisConfig
+// region getAppliedRedisConfig
 func TestGetAppliedRedisConfigProcessesAdditionalConfigPassedIntoRedisClusterWithDefault(t *testing.T) {
 	redisConfig := `
 maxmemory 128mb
@@ -189,7 +190,7 @@ Got: %v
 
 //endregion
 
-//region getRedisConfigFromMultilineYaml
+// region getRedisConfigFromMultilineYaml
 func TestGetRedisConfigFromMultilineYaml(t *testing.T) {
 	redisConfigString := `maxmemory 128mb
 maxmemory-samples 5
@@ -210,7 +211,7 @@ Got %v`, expectedRedisConfig, gotRedisConfig)
 
 //endregion
 
-//region createConfigMapSpec
+// region createConfigMapSpec
 func TestCreateConfigMapSpecShouldHaveRedisConfKey(t *testing.T) {
 	cluster := &cachev1alpha1.RedisCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -229,7 +230,7 @@ func TestCreateConfigMapSpecShouldHaveRedisConfKey(t *testing.T) {
 
 //endregion
 
-//region CreateConfigMap
+// region CreateConfigMap
 func TestCreateConfigMap(t *testing.T) {
 	redisCluster := cachev1alpha1.RedisCluster{
 		ObjectMeta: metav1.ObjectMeta{

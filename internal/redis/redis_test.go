@@ -2,13 +2,14 @@ package redis
 
 import (
 	"context"
-	"github.com/containersolutions/redis-cluster-operator/api/v1alpha1"
-	"github.com/go-redis/redis/v8"
-	"github.com/go-redis/redismock/v8"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"testing"
+
+	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redismock/v8"
+	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // region NewNodeAttributes

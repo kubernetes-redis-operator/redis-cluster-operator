@@ -2,16 +2,17 @@ package kubernetes
 
 import (
 	"context"
-	cachev1alpha1 "github.com/containersolutions/redis-cluster-operator/api/v1alpha1"
+	"reflect"
+	"testing"
+
+	cachev1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/scheme"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
 )
 
 // region FetchExistingConfigMap
@@ -109,12 +110,13 @@ func TestFindExistingServiceReturnsNotFoundErrorIfNotExists(t *testing.T) {
 		t.Fatalf("Expected not found error but received unexpected error %v", err)
 	}
 }
+
 // endregion
 
 func TestCreateServiceSpec(t *testing.T) {
 	cluster := &cachev1alpha1.RedisCluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "redis-cluster",
+			Name:      "redis-cluster",
 			Namespace: "default",
 		},
 	}

@@ -1,0 +1,19 @@
+apiVersion: rediscluster.serdarkalayci.com/v1alpha1
+kind: RedisCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: rediscluster
+    app.kubernetes.io/instance: rediscluster-sample
+    app.kubernetes.io/part-of: redis-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: redis-operator
+  name: rediscluster-sample
+spec:
+  masters: 3
+  config: |
+    maxmemory 100mb
+    maxmemory-policy allkeys-lru
+  podSpec:
+    containers:
+      - name: redis
+        image: redis:5.0

@@ -19,21 +19,22 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/containersolutions/redis-cluster-operator/internal/kubernetes"
-	redis_internal "github.com/containersolutions/redis-cluster-operator/internal/redis"
-	"github.com/containersolutions/redis-cluster-operator/internal/utils"
+	"time"
+
 	"github.com/go-redis/redis/v8"
+	"github.com/serdarkalayci/redis-cluster-operator/internal/kubernetes"
+	redis_internal "github.com/serdarkalayci/redis-cluster-operator/internal/redis"
+	"github.com/serdarkalayci/redis-cluster-operator/internal/utils"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
-	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	cachev1alpha1 "github.com/containersolutions/redis-cluster-operator/api/v1alpha1"
+	cachev1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
 )
 
 // RedisClusterReconciler reconciles a RedisCluster object
@@ -42,9 +43,9 @@ type RedisClusterReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=cache.container-solutions.com,resources=redisclusters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=cache.container-solutions.com,resources=redisclusters/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=cache.container-solutions.com,resources=redisclusters/finalizers,verbs=update
+//+kubebuilder:rbac:groups=redis.kuro.io,resources=redisclusters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=redis.kuro.io,resources=redisclusters/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=redis.kuro.io,resources=redisclusters/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=configmaps;services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="apps",resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch

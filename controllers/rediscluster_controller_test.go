@@ -18,7 +18,9 @@ package controllers
 
 import (
 	"context"
-	cachev1alpha1 "github.com/containersolutions/redis-cluster-operator/api/v1alpha1"
+	"testing"
+
+	cachev1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
 	v1 "k8s.io/api/apps/v1"
 	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"testing"
 )
 
 func TestRedisClusterReconciler_Reconcile_ReturnsIfRedisClusterIsNotFound(t *testing.T) {

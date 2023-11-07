@@ -2,7 +2,10 @@ package kubernetes
 
 import (
 	"context"
-	cachev1alpha1 "github.com/containersolutions/redis-cluster-operator/api/v1alpha1"
+	"sort"
+	"testing"
+
+	cachev1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
 	v1 "k8s.io/api/apps/v1"
 	v13 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -10,8 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sort"
-	"testing"
 )
 
 func TestFetchExistingStatefulSetReturnsErrorIfNotFound(t *testing.T) {

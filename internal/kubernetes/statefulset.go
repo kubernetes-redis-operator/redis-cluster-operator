@@ -2,8 +2,9 @@ package kubernetes
 
 import (
 	"context"
-	"github.com/containersolutions/redis-cluster-operator/api/v1alpha1"
-	"github.com/containersolutions/redis-cluster-operator/internal/utils"
+
+	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
+	"github.com/serdarkalayci/redis-cluster-operator/internal/utils"
 	v1 "k8s.io/api/apps/v1"
 	v12 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,8 +14,8 @@ import (
 )
 
 const (
-	RedisNodeNameStatefulsetLabel = "cache.container-solutions.com/cluster-name"
-	RedisNodeComponentLabel       = "cache.container-solutions.com/cluster-component"
+	RedisNodeNameStatefulsetLabel = "redis.kuro.io/cluster-name"
+	RedisNodeComponentLabel       = "redis.kuro.io/cluster-component"
 )
 
 func GetStatefulSetLabels(cluster *v1alpha1.RedisCluster) labels.Set {

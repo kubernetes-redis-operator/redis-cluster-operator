@@ -3,9 +3,10 @@ package redis
 import (
 	"context"
 	"errors"
-	"github.com/containersolutions/redis-cluster-operator/api/v1alpha1"
 	"math"
 	"sort"
+
+	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
 )
 
 type ClusterNodes struct {
