@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
 	"github.com/serdarkalayci/redis-cluster-operator/internal/utils"
 	appsv1 "k8s.io/api/apps/v1"
@@ -16,8 +17,8 @@ import (
 )
 
 const (
-	RedisNodeNameStatefulsetLabel = "cache.serdarkalayci.com/cluster-name"
-	RedisNodeComponentLabel       = "cache.serdarkalayci.com/cluster-component"
+	RedisNodeNameStatefulsetLabel = "redis.kuro.io/cluster-name"
+	RedisNodeComponentLabel       = "redis.kuro.io/cluster-component"
 )
 
 func GetStatefulSetLabels(cluster *v1alpha1.RedisCluster) labels.Set {
@@ -56,14 +57,8 @@ func FetchExistingStatefulsets(ctx context.Context, kubeClient client.Client, cl
 		}
 		statefulsets = append(statefulsets, replss)
 	}
-	if len(errslice) > 0 {
-		creationError := fmt.Errorf("error fetching statefulsets")
-		for i := 0; i < len(errslice); i++ {
-			errors.Wrap(creationError, errslice[i].Error())
-		}
-		return nil, creationError
-	}
-	return statefulsets, err
+	fetchError := errors.Join(errslice...)
+	return statefulsets, fetchError
 }
 
 func CreateStatefulsets(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) ([]*appsv1.StatefulSet, error) {
@@ -86,20 +81,8 @@ func CreateStatefulsets(ctx context.Context, kubeClient client.Client, cluster *
 		statefulsets = append(statefulsets, replss)
 	}
 	// At this point, we may have some statefulsets created and some not. We need to clean up the ones that are created if stop is true
-	if len(errslice) > 0 {
-		creationError := fmt.Errorf("error creating statefulsets")
-		for i := 0; i < len(errslice); i++ {
-			errors.Wrap(creationError, errslice[i].Error())
-		}
-		for _, statefulset := range statefulsets {
-			err := kubeClient.Delete(ctx, statefulset)
-			if err != nil {
-				errors.Wrap(creationError, err.Error())
-			}
-		}
-		return nil, creationError
-	}
-	return statefulsets, nil
+	creationError := errors.Join(errslice...)
+	return statefulsets, creationError
 }
 
 func createStatefulsetSpec(cluster *v1alpha1.RedisCluster, namesuffix string) *appsv1.StatefulSet {

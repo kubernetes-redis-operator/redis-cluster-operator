@@ -21,11 +21,11 @@ import (
 func generateStatefulSets(name, namespace string, replPerMaster int) []client.Object {
 	sss := make([]client.Object, replPerMaster+1)
 	sss[0] = &v1.StatefulSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name + "-master",
-				Namespace: namespace,
-			},
-		}
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name + "-master",
+			Namespace: namespace,
+		},
+	}
 	for i := 0; i < replPerMaster; i++ {
 		sss[i+1] = &v1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
@@ -62,7 +62,7 @@ func TestFetchExistingStatefulSetReturnsErrorIfReplicaNotFound(t *testing.T) {
 	s.AddKnownTypes(cachev1alpha1.GroupVersion)
 	clientBuilder := fake.NewClientBuilder()
 	sss := generateStatefulSets("redis-cluster", "default", 2) // This will create 3 statefulsets, 1 master and 2 replicas
-	clientBuilder.WithObjects(sss[0:1]...) // Only create the master statefulset and one replica
+	clientBuilder.WithObjects(sss[0:1]...)                     // Only create the master statefulset and one replica
 	client := clientBuilder.Build()
 
 	cluster := &cachev1alpha1.RedisCluster{

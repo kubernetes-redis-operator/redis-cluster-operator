@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package controller
 
 import (
 	"context"
@@ -126,7 +126,7 @@ func TestRedisClusterReconciler_Reconcile_CreatesStatefulsetIfDoesntExist(t *tes
 
 	sts := &v1.StatefulSet{}
 	err := client.Get(context.TODO(), types.NamespacedName{
-		Name:      "redis-cluster",
+		Name:      "redis-cluster-master",
 		Namespace: "default",
 	}, sts)
 	if err != nil {
@@ -240,7 +240,7 @@ func TestRedisClusterReconciler_Reconcile_StatefulsetHasOwnerReferenceSetToRedis
 
 	sts := &v1.StatefulSet{}
 	err := client.Get(context.TODO(), types.NamespacedName{
-		Name:      "redis-cluster",
+		Name:      "redis-cluster-master",
 		Namespace: "default",
 	}, sts)
 	if err != nil {

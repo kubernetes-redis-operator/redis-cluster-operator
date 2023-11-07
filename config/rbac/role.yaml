@@ -6,40 +6,7 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - ""
-  resources:
-  - configmaps
-  - services
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - redis.kuro.io
+  - rediscluster.serdarkalayci.com
   resources:
   - redisclusters
   verbs:
@@ -51,13 +18,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - redis.kuro.io
+  - rediscluster.serdarkalayci.com
   resources:
   - redisclusters/finalizers
   verbs:
   - update
 - apiGroups:
-  - redis.kuro.io
+  - rediscluster.serdarkalayci.com
   resources:
   - redisclusters/status
   verbs:
