@@ -1,5 +1,7 @@
 # Redis Cluster Operator
 
+[![Operator Tests](https://github.com/serdarkalayci/redis-cluster-operator/actions/workflows/operator.yml/badge.svg)](https://github.com/serdarkalayci/redis-cluster-operator/actions/workflows/operator.yml)   [![Coverage Status](https://coveralls.io/repos/github/serdarkalayci/redis-cluster-operator/badge.svg?branch=main)](https://coveralls.io/github/serdarkalayci/redis-cluster-operator?branch=main)   [![Go Report Card](https://goreportcard.com/badge/github.com/serdarkalayci/redis-cluster-operator)](https://goreportcard.com/report/github.com/serdarkalayci/redis-cluster-operator)   [![Go Reference](https://pkg.go.dev/badge/github.com/serdarkalayci/redis-cluster-operator.svg)](https://pkg.go.dev/github.com/serdarkalayci/redis-cluster-operator)   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 The Redis Cluster Operator runs Redis Clusters on Kubernetes.
 
 We've found many operators which either use the redis-cli directly, which makes it hard to customise
@@ -9,14 +11,13 @@ The aim for this operator is to run productionised clusters with most necessary 
 as well as providing additions such as RunBooks to help debug issues with Redis Clusters 
 when running them with this Operator, and ready-made load tests to test your Redis Clusters with real traffic.
 
-* [Features](#features-this-operator-supports)
-* [Installing The Operator](#installing-the-operator)
-  * [Bundled Cluster Wide](#bundled-cluster-wide)
-  * [Bundled Namespaced](#bundled-namespaced)
-  * [OLM bundle](#olm-bundle)
-* [Creating your first Redis Cluster](#creating-your-first-redis-cluster)
-* [Documentation](./docs/home.md)
-* [Contributing](./CONTRIBUTING.md)
+- [Redis Cluster Operator](#redis-cluster-operator)
+  - [Features this operator supports](#features-this-operator-supports)
+  - [Installing the Operator](#installing-the-operator)
+    - [bundled cluster-wide](#bundled-cluster-wide)
+    - [bundled namespaced](#bundled-namespaced)
+    - [OLM bundle](#olm-bundle)
+  - [Creating your first Redis Cluster](#creating-your-first-redis-cluster)
 
 ## Features this operator supports
 - [x] Cluster Creation
