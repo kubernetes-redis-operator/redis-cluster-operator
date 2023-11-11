@@ -1,4 +1,4 @@
-apiVersion: rediscluster.serdarkalayci.com/v1alpha1
+apiVersion: rediscluster.kuro.io/v1alpha1
 kind: RedisCluster
 metadata:
   labels:
@@ -10,6 +10,7 @@ metadata:
   name: rediscluster-sample
 spec:
   masters: 3
+  replicasPerMaster: 2
   config: |
     maxmemory 100mb
     maxmemory-policy allkeys-lru

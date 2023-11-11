@@ -14,7 +14,7 @@ Overriding the Redis Image.
 This is especially useful if you have a custom Redis Image, or would like to use a different version
 
 ```yaml
-apiVersion: redis.kuro.io/v1alpha1
+apiVersion: rediscluster.kuro.io/v1alpha1
 kind: RedisCluster
 metadata:
   name: rediscluster-sample

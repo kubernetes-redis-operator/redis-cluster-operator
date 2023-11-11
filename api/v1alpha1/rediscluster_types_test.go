@@ -77,7 +77,7 @@ func TestRedisCluster_NodesNeeded(t *testing.T) {
 
 func TestRedisConfigIsProcessedCorrectly(t *testing.T) {
 	redisClusterYaml := `---
-apiVersion: redis.kuro.io/v1alpha1
+apiVersion: rediscluster.kuro.io/v1alpha1
 kind: RedisCluster
 metadata:
   name: redis-cluster

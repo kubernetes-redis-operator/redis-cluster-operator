@@ -2,7 +2,7 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/rediscluster.serdarkalayci.com_redisclusters.yaml
+- bases/rediscluster.kuro.io_redisclusters.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 #patchesStrategicMerge:
@@ -17,7 +17,7 @@ patchesJson6902:
       group: apiextensions.k8s.io
       version: v1
       kind: CustomResourceDefinition
-      name: redisclusters.rediscluster.serdarkalayci.com
+      name: redisclusters.rediscluster.kuro.io
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
 # patches here are for enabling the CA injection for each CRD

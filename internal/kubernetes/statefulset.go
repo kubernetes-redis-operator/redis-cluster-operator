@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	RedisNodeNameStatefulsetLabel = "redis.kuro.io/cluster-name"
-	RedisNodeComponentLabel       = "redis.kuro.io/cluster-component"
+	RedisNodeNameStatefulsetLabel = "rediscluster.kuro.io/cluster-name"
+	RedisNodeComponentLabel       = "rediscluster.kuro.io/cluster-component"
 )
 
 func GetStatefulSetLabels(cluster *v1alpha1.RedisCluster) labels.Set {
@@ -86,7 +86,7 @@ func CreateStatefulsets(ctx context.Context, kubeClient client.Client, cluster *
 }
 
 func createStatefulsetSpec(cluster *v1alpha1.RedisCluster, namesuffix string) *appsv1.StatefulSet {
-	replicasNeeded := cluster.Spec.ReplicasPerMaster
+	replicasNeeded := cluster.Spec.Masters
 	statefulset := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name + "-" + namesuffix,

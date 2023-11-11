@@ -13,7 +13,7 @@ First you'll need to add the Redis Exporter to export metrics.
 You can do this in the RedisCluster CRD.
 
 ```yaml
-apiVersion: redis.kuro.io/v1alpha1
+apiVersion: rediscluster.kuro.io/v1alpha1
 kind: RedisCluster
 metadata:
   name: rediscluster-sample
@@ -55,8 +55,8 @@ spec:
     matchLabels:
       # We need to specify which cluster, and which component to monitor.
       # All pods have these labels for a Redis Cluster
-      redis.kuro.io/cluster-component: redis
-      redis.kuro.io/cluster-name: rediscluster-sample
+      rediscluster.kuro.io/cluster-component: redis
+      rediscluster.kuro.io/cluster-name: rediscluster-sample
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: Prometheus

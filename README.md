@@ -68,7 +68,7 @@ The Operator will support Namespaced mode in the future.
 To create your first Redis cluster, you'll need a CRD.
 
 ```yaml
-apiVersion: redis.kuro.io/v1alpha1
+apiVersion: rediscluster.kuro.io/v1alpha1
 kind: RedisCluster
 metadata:
   name: rediscluster-product-api

@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.11.1
   creationTimestamp: null
-  name: redisclusters.redis.kuro.io
+  name: redisclusters.rediscluster.kuro.io
 spec:
-  group: redis.kuro.io
+  group: rediscluster.kuro.io
   names:
     kind: RedisCluster
     listKind: RedisClusterList

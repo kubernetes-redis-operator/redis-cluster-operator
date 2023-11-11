@@ -4,4 +4,4 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: CERTIFICATE_NAMESPACE/CERTIFICATE_NAME
-  name: redisclusters.rediscluster.serdarkalayci.com
+  name: redisclusters.rediscluster.kuro.io
