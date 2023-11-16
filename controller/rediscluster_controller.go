@@ -259,29 +259,28 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//endregion
 
 	//region Check if cluster needs to be scaled up
-
-	// First we need to check if the master statefulset has less replicas than are needed for the cluster.
-	if *statefulsets[0].Spec.Replicas < redisCluster.Spec.Masters {
-		// The statefulset has less replicas than are needed for the cluster.
-		// This means the user is trying to scale up the cluster, and we need to scale up the statefulset
-		// and let the reconciliation take care of stabilising the cluster.
-		logger.Info("Scaling up statefulset for Redis Cluster")
-		replicas := redisCluster.Spec.Masters
-		for _, statefulset := range statefulsets {
+	replicas := redisCluster.Spec.Masters
+	for _, statefulset := range statefulsets {
+		if *statefulset.Spec.Replicas < redisCluster.Spec.Masters {
+			// The statefulset has less replicas than are needed for the cluster.
+			// This means the user is trying to scale up the cluster, and we need to scale up the statefulset
+			// and let the reconciliation take care of stabilising the cluster.
+			logger.Info("Scaling up statefulset for Redis Cluster")
 			statefulset.Spec.Replicas = &replicas
 			err = r.Client.Update(ctx, statefulset)
 			if err != nil {
 				return r.RequeueError(ctx, "Could not update statefulset replicas", err)
 			}
 		}
-		// We've successfully updated the replicas for all statefulsets.
-		// Now we can wait for the pods to come up and then continue on the
-		// normal process for stabilising the Redis Cluster
-		logger.Info("Scaling up statefulset for Redis Cluster successful. Reconciling again in 5 seconds.")
-		return ctrl.Result{
-			RequeueAfter: 5 * time.Second,
-		}, nil
 	}
+	// We've successfully updated the replicas for all statefulsets.
+	// Now we can wait for the pods to come up and then continue on the
+	// normal process for stabilising the Redis Cluster
+	logger.Info("Scaling up statefulset for Redis Cluster successful. Reconciling again in 5 seconds.")
+	return ctrl.Result{
+		RequeueAfter: 5 * time.Second,
+	}, nil
+
 	//endregion
 
 	//region Check if cluster needs to be scaled down
