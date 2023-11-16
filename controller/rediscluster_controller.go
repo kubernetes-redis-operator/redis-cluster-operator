@@ -176,15 +176,18 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			logger.Error(err, "Cannot find statefulset")
 			return err
 		}
-		err = ctrl.SetControllerReference(redisCluster, statefulsets[0], r.Scheme) // ToDo: This is a hack. We should update all statefulsets
+		for _, statefulset := range statefulsets {
+		err = ctrl.SetControllerReference(redisCluster, statefulset, r.Scheme) // ToDo: This is a hack. We should update all statefulsets
 		if err != nil {
 			logger.Error(err, "Could not set owner reference for statefulset")
 			return err
 		}
-		err = r.Client.Update(ctx, statefulsets[0]) // ToDo: This is a hack. We should update all statefulsets
+		err = r.Client.Update(ctx, statefulset) // ToDo: This is a hack. We should update all statefulsets
 		if err != nil {
 			logger.Error(err, "Could not update statefulset with owner reference")
+			return err
 		}
+	}
 		return err
 	})
 	if err != nil {
@@ -255,18 +258,23 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	//endregion
 
-	if *statefulsets[0].Spec.Replicas < redisCluster.NodesNeeded() {
+	//region Check if cluster needs to be scaled up
+
+	// First we need to check if the master statefulset has less replicas than are needed for the cluster.
+	if *statefulsets[0].Spec.Replicas < redisCluster.Spec.Masters {
 		// The statefulset has less replicas than are needed for the cluster.
 		// This means the user is trying to scale up the cluster, and we need to scale up the statefulset
 		// and let the reconciliation take care of stabilising the cluster.
 		logger.Info("Scaling up statefulset for Redis Cluster")
-		replicas := redisCluster.NodesNeeded()
-		statefulsets[0].Spec.Replicas = &replicas
-		err = r.Client.Update(ctx, statefulsets[0])
-		if err != nil {
-			return r.RequeueError(ctx, "Could not update statefulset replicas", err)
+		replicas := redisCluster.Spec.Masters
+		for _, statefulset := range statefulsets {
+			statefulset.Spec.Replicas = &replicas
+			err = r.Client.Update(ctx, statefulset)
+			if err != nil {
+				return r.RequeueError(ctx, "Could not update statefulset replicas", err)
+			}
 		}
-		// We've successfully updated the replicas for the statefulset.
+		// We've successfully updated the replicas for all statefulsets.
 		// Now we can wait for the pods to come up and then continue on the
 		// normal process for stabilising the Redis Cluster
 		logger.Info("Scaling up statefulset for Redis Cluster successful. Reconciling again in 5 seconds.")
@@ -274,13 +282,16 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			RequeueAfter: 5 * time.Second,
 		}, nil
 	}
+	//endregion
 
-	if *statefulsets[0].Spec.Replicas > redisCluster.NodesNeeded() {
+	//region Check if cluster needs to be scaled down
+	if *statefulsets[0].Spec.Replicas > redisCluster.Spec.Masters {
 		// The statefulset has more replicas than are needed for the cluster.
 		// This means the user is trying to scale down the cluster, and we need to scale down the statefulset
 		// but this time we have to make sure that the nodes that are going to be deleted had their slots given away
 		// to the nodes that are to stay before we can delete them.
 	}
+	//endregion
 
 	pods, err := kubernetes.FetchRedisPods(ctx, r.Client, redisCluster)
 	if err != nil {
@@ -307,7 +318,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	allPodsReady := len(clusterNodes.Nodes) == int(redisCluster.NodesNeeded())
+	allPodsReady := len(clusterNodes.Nodes) == int(redisCluster.Spec.Masters)
 	if !allPodsReady {
 		logger.Info("Not all pods are ready. Reconciling again in 10 seconds")
 		return ctrl.Result{

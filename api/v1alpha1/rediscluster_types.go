@@ -63,10 +63,6 @@ type RedisCluster struct {
 	Status RedisClusterStatus `json:"status,omitempty"`
 }
 
-func (cluster *RedisCluster) NodesNeeded() int32 {
-	return cluster.Spec.Masters + (cluster.Spec.Masters * cluster.Spec.ReplicasPerMaster)
-}
-
 //+kubebuilder:object:root=true
 
 // RedisClusterList contains a list of RedisCluster
