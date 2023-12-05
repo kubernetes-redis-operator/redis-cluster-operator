@@ -65,6 +65,7 @@ func CreateStatefulsets(ctx context.Context, kubeClient client.Client, cluster *
 	var errslice []error
 	var statefulsets []*appsv1.StatefulSet
 	masterss := createStatefulsetSpec(cluster, "master")
+	masterss.Labels["rediscluster.kuro.io/cluster-role"] = "master"
 	err := kubeClient.Create(ctx, masterss)
 	if err != nil {
 		errslice = append(errslice, err)
@@ -73,6 +74,7 @@ func CreateStatefulsets(ctx context.Context, kubeClient client.Client, cluster *
 	statefulsets = append(statefulsets, masterss) // Append to the list after creating and having no error just because we know what to clean up in case of an error later on
 	for i := 0; i < int(cluster.Spec.ReplicasPerMaster) && len(errslice) == 0; i++ {
 		replss := createStatefulsetSpec(cluster, fmt.Sprintf("repl-%d", i))
+		replss.Labels["rediscluster.kuro.io/cluster-role"] = "replica"
 		err := kubeClient.Create(ctx, replss)
 		if err != nil {
 			errslice = append(errslice, err)
