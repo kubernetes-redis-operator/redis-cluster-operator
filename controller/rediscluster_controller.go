@@ -25,6 +25,8 @@ import (
 	"github.com/serdarkalayci/redis-cluster-operator/internal/kubernetes"
 	redis_internal "github.com/serdarkalayci/redis-cluster-operator/internal/redis"
 	"github.com/serdarkalayci/redis-cluster-operator/internal/utils"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -135,8 +137,8 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//endregion
 
 	//region Ensure Statefulset
-	statefulsets, err := kubernetes.FetchExistingStatefulsets(ctx, r.Client, redisCluster)
-	if (err != nil && !apierrors.IsNotFound(err)) || len(statefulsets) != int(redisCluster.Spec.ReplicasPerMaster+1) {
+	masterSSet, replSSets, err := kubernetes.FetchExistingStatefulsets(ctx, r.Client, redisCluster)
+	if (err != nil && !apierrors.IsNotFound(err)) {
 		// We've got a legitimate error, we should log the error and exit early
 		logger.Error(err, "Could not check whether statefulset exists due to error.")
 		return ctrl.Result{
@@ -146,7 +148,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if apierrors.IsNotFound(err) {
 		// We need to create the Statefulset
-		statefulsets, err = kubernetes.CreateStatefulsets(ctx, r.Client, redisCluster)
+		masterSSet, replSSets, err = kubernetes.CreateStatefulsets(ctx, r.Client, redisCluster)
 		if err != nil {
 			logger.Error(err, "Failed to create Statefulset for RedisCluster")
 			return ctrl.Result{
@@ -164,32 +166,53 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//endregion
 
 	//region Set Statefsulset owner reference
+	masterSSet, replSSets, err = kubernetes.FetchExistingStatefulsets(ctx, r.Client, redisCluster)
+	if err != nil {
+		// At this point we definitely expect the statefulset to exist.
+		logger.Error(err, "Cannot find statefulsets")
+		return ctrl.Result{
+			RequeueAfter: 5 * time.Second,
+		}, err
+	}
 	err = retry.RetryOnConflict(wait.Backoff{
 		Steps:    5,
 		Duration: 2 * time.Second,
 		Factor:   1.0,
 		Jitter:   0.1,
 	}, func() error {
-		statefulsets, err = kubernetes.FetchExistingStatefulsets(ctx, r.Client, redisCluster)
-		if err != nil {
-			// At this point we definitely expect the statefulset to exist.
-			logger.Error(err, "Cannot find statefulset")
+			err = ctrl.SetControllerReference(redisCluster, masterSSet, r.Scheme) // ToDo: This is a hack. We should update all statefulsets
+			if err != nil {
+				logger.Error(err, fmt.Sprintf("Could not set owner name for master statefulset named %s", masterSSet.Name))
+				return err
+			}
+			err = r.Client.Update(ctx, masterSSet) // ToDo: This is a hack. We should update all statefulsets
+			if err != nil {
+				logger.Error(err, fmt.Sprintf("Could not update master statefulset named %s  with owner reference", masterSSet.Name))
+				return err
+			}
 			return err
-		}
-		for _, statefulset := range statefulsets {
-		err = ctrl.SetControllerReference(redisCluster, statefulset, r.Scheme) // ToDo: This is a hack. We should update all statefulsets
-		if err != nil {
-			logger.Error(err, "Could not set owner reference for statefulset")
-			return err
-		}
-		err = r.Client.Update(ctx, statefulset) // ToDo: This is a hack. We should update all statefulsets
-		if err != nil {
-			logger.Error(err, "Could not update statefulset with owner reference")
-			return err
-		}
-	}
-		return err
 	})
+	for _, statefulset := range replSSets {
+		err = retry.RetryOnConflict(wait.Backoff{
+			Steps:    5,
+			Duration: 2 * time.Second,
+			Factor:   1.0,
+			Jitter:   0.1,
+		}, func() error {
+			err = ctrl.SetControllerReference(redisCluster, statefulset, r.Scheme) // ToDo: This is a hack. We should update all statefulsets
+			if err != nil {
+				logger.Error(err, fmt.Sprintf("Could not set owner name for replica statefulset named %s", statefulset.Name))
+				return err
+			}
+			err = r.Client.Update(ctx, statefulset) // ToDo: This is a hack. We should update all statefulsets
+			if err != nil {
+				logger.Error(err, fmt.Sprintf("Could not update replica statefulset named %s  with owner reference", statefulset.Name))
+				return err
+			}
+			return err
+			
+			})
+		}
 	if err != nil {
 		logger.Error(err, "Could not set owner reference for statefulset")
 		return ctrl.Result{
@@ -258,10 +281,50 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	//endregion
 
-	//region Check if cluster needs to be scaled up
+	//region Check if cluster needs to be scaled out
+	scaleOut := false
 	replicas := redisCluster.Spec.Masters
-	for _, statefulset := range statefulsets {
+	// First check if master statefulset needs to be scaled out
+	if *masterSSet.Spec.Replicas < redisCluster.Spec.Masters {
+		scaleOut = true
+		// The statefulset has less replicas than are needed for the cluster.
+		// This means the user is trying to scale up the cluster, and we need to scale up the statefulset
+		// and let the reconciliation take care of stabilising the cluster.
+		logger.Info("Scaling up statefulset for Redis Cluster")
+		masterSSet.Spec.Replicas = &replicas
+		err = r.Client.Update(ctx, masterSSet)
+		if err != nil {
+			return r.RequeueError(ctx, "Could not update statefulset replicas", err)
+		}
+	}
+	for _, statefulset := range replSSets {
 		if *statefulset.Spec.Replicas < redisCluster.Spec.Masters {
+			statefulset.Spec.Replicas = &replicas
+			err = r.Client.Update(ctx, statefulset)
+			if err != nil {
+				return r.RequeueError(ctx, "Could not update statefulset replicas", err)
+			}
+		}
+	}
+	if scaleOut {
+		// We've successfully updated the replicas for all statefulsets.
+		// Now we can wait for the pods to come up and then continue on the
+		// normal process for stabilising the Redis Cluster
+		logger.Info("Scaling out statefulset for Redis Cluster successful. Reconciling again in 5 seconds.")
+		return ctrl.Result{
+			RequeueAfter: 5 * time.Second,
+		}, nil
+	}
+
+
+	//endregion
+
+	//region Check if cluster needs to be scaled in
+	scaleIn := false
+	// First we have to rebalance the masters if we have to scale in
+	
+	for _, statefulset := range replSSets {
+		if *statefulset.Spec.Replicas > redisCluster.Spec.Masters {
 			// The statefulset has less replicas than are needed for the cluster.
 			// This means the user is trying to scale up the cluster, and we need to scale up the statefulset
 			// and let the reconciliation take care of stabilising the cluster.
@@ -273,22 +336,14 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 	}
-	// We've successfully updated the replicas for all statefulsets.
-	// Now we can wait for the pods to come up and then continue on the
-	// normal process for stabilising the Redis Cluster
-	logger.Info("Scaling up statefulset for Redis Cluster successful. Reconciling again in 5 seconds.")
-	return ctrl.Result{
-		RequeueAfter: 5 * time.Second,
-	}, nil
-
-	//endregion
-
-	//region Check if cluster needs to be scaled down
-	if *statefulsets[0].Spec.Replicas > redisCluster.Spec.Masters {
-		// The statefulset has more replicas than are needed for the cluster.
-		// This means the user is trying to scale down the cluster, and we need to scale down the statefulset
-		// but this time we have to make sure that the nodes that are going to be deleted had their slots given away
-		// to the nodes that are to stay before we can delete them.
+	if scaleIn {
+		// We've successfully updated the replicas for all statefulsets.
+		// Now we can wait for the pods to come up and then continue on the
+		// normal process for stabilising the Redis Cluster
+		logger.Info("Scaling in statefulset for Redis Cluster successful. Reconciling again in 5 seconds.")
+		return ctrl.Result{
+			RequeueAfter: 5 * time.Second,
+		}, nil
 	}
 	//endregion
 
@@ -410,4 +465,18 @@ func (r *RedisClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&redisclusterv1alpha1.RedisCluster{}).
 		Complete(r)
+}
+
+type clusterInfo struct {
+	redisCluster *redisclusterv1alpha1.RedisCluster
+	masterSS *appsv1.StatefulSet
+	replicaSS []*appsv1.StatefulSet
+	masterPods []*corev1.Pod
+	replicaPods []*corev1.Pod
+	cm *corev1.ConfigMap
+	scr *corev1.Secret
+}
+
+func decorateRedisCluster(rdcl *redisclusterv1alpha1.RedisCluster)  {
+
 }
