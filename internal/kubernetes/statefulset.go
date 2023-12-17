@@ -34,9 +34,9 @@ func GetPodLabels(cluster *v1alpha1.RedisCluster) labels.Set {
 	}
 }
 
-func FetchExistingStatefulsets(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) ([]*appsv1.StatefulSet, error) {
+func FetchExistingStatefulsets(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
 	var errslice []error
-	var statefulsets []*appsv1.StatefulSet
+	var replicass = make ([]*appsv1.StatefulSet, cluster.Spec.ReplicasPerMaster)
 	masterss := &appsv1.StatefulSet{}
 	err := kubeClient.Get(ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -45,7 +45,6 @@ func FetchExistingStatefulsets(ctx context.Context, kubeClient client.Client, cl
 	if err != nil {
 		errslice = append(errslice, err)
 	}
-	statefulsets = append(statefulsets, masterss)
 	for i := 0; i < int(cluster.Spec.ReplicasPerMaster); i++ {
 		replss := &appsv1.StatefulSet{}
 		err := kubeClient.Get(ctx, types.NamespacedName{
@@ -55,23 +54,24 @@ func FetchExistingStatefulsets(ctx context.Context, kubeClient client.Client, cl
 		if err != nil {
 			errslice = append(errslice, err)
 		}
-		statefulsets = append(statefulsets, replss)
+		replicass[i] = replss
 	}
 	fetchError := errors.Join(errslice...)
-	return statefulsets, fetchError
+	return masterss, replicass, fetchError
 }
 
-func CreateStatefulsets(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) ([]*appsv1.StatefulSet, error) {
+func CreateStatefulsets(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
 	var errslice []error
-	var statefulsets []*appsv1.StatefulSet
+	var replicass = make ([]*appsv1.StatefulSet, cluster.Spec.ReplicasPerMaster)
 	masterss := createStatefulsetSpec(cluster, "master")
 	masterss.Labels["rediscluster.kuro.io/cluster-role"] = "master"
 	err := kubeClient.Create(ctx, masterss)
 	if err != nil {
 		errslice = append(errslice, err)
-		return nil, err
+		return nil, nil, err
 	}
-	statefulsets = append(statefulsets, masterss) // Append to the list after creating and having no error just because we know what to clean up in case of an error later on
+
+	// Append to the list after creating and having no error just because we know what to clean up in case of an error later on
 	for i := 0; i < int(cluster.Spec.ReplicasPerMaster) && len(errslice) == 0; i++ {
 		replss := createStatefulsetSpec(cluster, fmt.Sprintf("repl-%d", i))
 		replss.Labels["rediscluster.kuro.io/cluster-role"] = "replica"
@@ -80,11 +80,11 @@ func CreateStatefulsets(ctx context.Context, kubeClient client.Client, cluster *
 			errslice = append(errslice, err)
 			break
 		}
-		statefulsets = append(statefulsets, replss)
+		replicass = append(replicass, replss)
 	}
 	// At this point, we may have some statefulsets created and some not. We need to clean up the ones that are created if stop is true
 	creationError := errors.Join(errslice...)
-	return statefulsets, creationError
+	return masterss, replicass, creationError
 }
 
 func createStatefulsetSpec(cluster *v1alpha1.RedisCluster, namesuffix string) *appsv1.StatefulSet {
