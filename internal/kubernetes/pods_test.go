@@ -21,7 +21,7 @@ func TestFetchRedisPodsFetchesAllRedisPods(t *testing.T) {
 		},
 	}
 	s := scheme.Scheme
-	s.AddKnownTypes(cachev1alpha1.GroupVersion)
+	s.AddKnownTypes(cachev1alpha1.GroupVersion, cluster)
 	clientBuilder := fake.NewClientBuilder()
 	clientBuilder.WithObjects(cluster)
 	clientBuilder.WithObjects(&v1.Pod{
@@ -61,7 +61,7 @@ func TestFetchRedisPodsFetchesAllRedisPodsExcludingOtherPods(t *testing.T) {
 		},
 	}
 	s := scheme.Scheme
-	s.AddKnownTypes(cachev1alpha1.GroupVersion)
+	s.AddKnownTypes(cachev1alpha1.GroupVersion, cluster)
 	clientBuilder := fake.NewClientBuilder()
 	clientBuilder.WithObjects(cluster)
 	clientBuilder.WithObjects(&v1.Pod{

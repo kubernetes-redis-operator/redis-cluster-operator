@@ -128,3 +128,26 @@ func TestCreateServiceSpec(t *testing.T) {
 		t.Fatalf("Service selector does not match pods labels")
 	}
 }
+
+func TestCreateService(t *testing.T) {
+	// Register operator types with the runtime scheme.
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+	clientBuilder := fake.NewClientBuilder()
+	client := clientBuilder.Build()
+
+	cluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+	}
+
+	service, err := CreateService(context.Background(), client, cluster)
+	if err != nil {
+		t.Fatalf("Expected no error but received %v", err)
+	}
+	if service.Name != "redis-cluster" || service.Namespace != "default" {
+		t.Fatalf("Expected correct Service to be created, but received an unexpected one Name: %s Namespace: %s", service.Name, service.Namespace)
+	}
+}
