@@ -10,6 +10,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/go-redis/redismock/v8"
 	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -290,6 +291,66 @@ func TestClusterNodes_GetReplicas(t *testing.T) {
 	if masters[0].NodeAttributes.ID != "85613000e76a00c2da80e9eae0f2fed6bc857605" {
 		t.Fatalf("Incorrect replica list returned")
 	}
+}
+
+func TestClusterNodes_EnsureClusterReplicationRatioWithFittingMasters(t *testing.T) {
+	// We are testing here that a cluster is replicated in the way we specified.
+	node1, err := NewNode(context.TODO(), &redis.Options{
+		Addr: "10.20.30.40:6379",
+	}, &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rediscluster",
+			Namespace: "default",
+		},
+	}, func(opt *redis.Options) *redis.Client {
+		client, mock := redismock.NewClientMock()
+		mock.ExpectClusterNodes().SetVal(`9fd8800b31d569538917c0aaeaa5588e2f9c6edf 10.20.30.40:6379@16379 myself,master - 0 1652373716000 0 connected
+9fd8800b31d569538917c0aaeaa5588e2f9c6edg 10.20.30.41:6379@16379 master - 0 1652373716000 0 connected
+`)
+		return client
+	})
+	if err != nil {
+		t.Fatalf("received error while trying to create node %v", err)
+	}
+
+	replicaClient, replicaMock := redismock.NewClientMock()
+	replicaMock.ExpectClusterNodes().SetVal(`9fd8800b31d569538917c0aaeaa5588e2f9c6edf 10.20.30.40:6379@16379 master - 0 1652373716000 0 connected
+9fd8800b31d569538917c0aaeaa5588e2f9c6edg 10.20.30.41:6379@16379 myself,master - 0 1652373716000 0 connected
+`)
+	replicaMock.ExpectClusterReplicate("9fd8800b31d569538917c0aaeaa5588e2f9c6edf").SetVal("OK")
+
+	node2, err := NewNode(context.TODO(), &redis.Options{
+		Addr: "10.20.30.41:6379",
+	}, &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rediscluster",
+			Namespace: "default",
+		},
+	}, func(opt *redis.Options) *redis.Client {
+		return replicaClient
+	})
+	if err != nil {
+		t.Fatalf("received error while trying to create node %v", err)
+	}
+
+	clusterNodes := ClusterNodes{
+		Nodes: []*Node{
+			node1,
+			node2,
+		},
+	}
+	err = clusterNodes.EnsureClusterReplicationRatio(context.TODO(), &v1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.RedisClusterSpec{
+			Masters:           2,
+			ReplicasPerMaster: 1,
+		},
+	})
+
+	assert.NoError(t, err)
 }
 
 func TestClusterNodes_EnsureClusterReplicationRatioIfTooManyMasters(t *testing.T) {

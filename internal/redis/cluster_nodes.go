@@ -210,6 +210,7 @@ func (c *ClusterNodes) EnsureClusterReplicationRatio(ctx context.Context, cluste
 	return nil
 }
 
+// MoveSlot moves a single slot from one node to another
 func (c *ClusterNodes) MoveSlot(ctx context.Context, source, destination *Node, slot int) error {
 	err := destination.Client.Do(ctx, "cluster", "setslot", slot, "importing", source.NodeAttributes.ID).Err()
 	if err != nil {

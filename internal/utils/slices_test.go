@@ -1,9 +1,11 @@
 package utils
 
 import (
-	v1 "k8s.io/api/core/v1"
 	"sort"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestMergeContainerPorts(t *testing.T) {
@@ -51,6 +53,57 @@ func TestMergeContainerPorts(t *testing.T) {
 	if merged[1].Name != "new-foo" || merged[1].HostPort != 8080 {
 		t.Fatalf("New port was not added")
 	}
+}
+
+func TestMergeVolumes(t *testing.T) {
+	originalVolumes := []v1.Volume{
+		{
+			Name:      "foobar",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: "foobar-cm",
+					},
+				},
+			},
+		},
+	}
+	overrideVolumes := []v1.Volume{
+		{
+			Name:      "foobar",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: "foobar-new-cm",
+					},
+				},
+			},
+		},
+		{
+			Name:      "new-foo",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/data",
+				},
+			},
+		},
+	}
+	merged := MergeVolumes(originalVolumes, overrideVolumes)
+	sort.Slice(merged, func(i, j int) bool {
+		return merged[i].Name < merged[j].Name
+	})
+	assert.Equal(t, v1.VolumeSource{
+		ConfigMap: &v1.ConfigMapVolumeSource{
+			LocalObjectReference: v1.LocalObjectReference{
+				Name: "foobar-new-cm",
+			},
+		},
+	}, merged[0].VolumeSource)
+	assert.Equal(t, v1.VolumeSource{
+		HostPath: &v1.HostPathVolumeSource{
+			Path: "/data",
+		},
+	}, merged[1].VolumeSource)
 }
 
 func TestMergeVolumeMounts(t *testing.T) {
