@@ -51,7 +51,8 @@ func TestFetchExistingStatefulSetReturnsErrorIfNotFound(t *testing.T) {
 		},
 	}
 
-	_, _, err := FetchExistingStatefulsets(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	_, _, err := km.FetchStatefulsets(context.TODO(), cluster)
 	assert.Error(t, err)
 	assert.True(t, apierrors.IsNotFound(err))
 }
@@ -76,7 +77,8 @@ func TestFetchExistingStatefulSetReturnsErrorIfReplicaNotFound(t *testing.T) {
 		},
 	}
 
-	_, _, err := FetchExistingStatefulsets(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	_, _, err := km.FetchStatefulsets(context.TODO(), cluster)
 	assert.Error(t, err)
 	assert.True(t, apierrors.IsNotFound(err))
 }
@@ -102,7 +104,8 @@ func TestFetchExistingStatefulSetReturnsStatefulsetIfFound(t *testing.T) {
 		},
 	}
 
-	masterss, replicass, err := FetchExistingStatefulsets(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	masterss, replicass, err := km.FetchStatefulsets(context.TODO(), cluster)
 	assert.NoError(t, err)
 	assert.Equal(t, "redis-cluster-master", masterss.Name)
 	assert.Len(t, replicass, 2)
@@ -129,7 +132,8 @@ func TestFetchExistingStatefulSetReturnsCorrectStatefulsetIfMany(t *testing.T) {
 		},
 	}
 
-	masterss, replicass, err := FetchExistingStatefulsets(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	masterss, replicass, err := km.FetchStatefulsets(context.TODO(), cluster)
 	assert.NoError(t, err)
 	assert.Len(t, replicass, 3)
 	assert.Equal(t, "redis-cluster-master", masterss.Name)
@@ -153,7 +157,8 @@ func TestCreateStatefulset_CanCreateStatefulset(t *testing.T) {
 		},
 	}
 
-	_, _, err := CreateStatefulsets(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	_, _, err := km.CreateStatefulsets(context.TODO(), cluster)
 	if err != nil {
 		t.Fatalf("Expected Statefulset to be created sucessfully, but received an error %v", err)
 	}
@@ -192,7 +197,8 @@ func TestCreateStatefulset_ThrowsErrorIfStatefulsetAlreadyExists(t *testing.T) {
 		},
 	}
 
-	_, _, err := CreateStatefulsets(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	_, _, err := km.CreateStatefulsets(context.TODO(), cluster)
 	assert.Error(t, err)
 }
 
@@ -221,7 +227,8 @@ func TestCreateStatefulset_ThrowsErrorIfReplStatefulsetAlreadyExists(t *testing.
 		},
 	}
 
-	_, _, err := CreateStatefulsets(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	_, _, err := km.CreateStatefulsets(context.TODO(), cluster)
 	assert.Error(t, err)
 }
 

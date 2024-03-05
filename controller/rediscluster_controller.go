@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/serdarkalayci/redis-cluster-operator/internal/kubernetes"
 	redis_internal "github.com/serdarkalayci/redis-cluster-operator/internal/redis"
 	"github.com/serdarkalayci/redis-cluster-operator/internal/utils"
 	appsv1 "k8s.io/api/apps/v1"
@@ -33,7 +32,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	redisclusterv1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
@@ -41,7 +39,7 @@ import (
 
 // RedisClusterReconciler reconciles a RedisCluster object
 type RedisClusterReconciler struct {
-	client.Client
+	KubernetesManager    IKubernetesManager
 	Scheme *runtime.Scheme
 }
 
@@ -64,8 +62,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	logger.Info("Reconciling RedisCluster", "cluster", req.Name, "namespace", req.Namespace)
 
 	//region Try to get the RedisCluster object from the cluster to make sure it still exists
-	redisCluster := &redisclusterv1alpha1.RedisCluster{}
-	err := r.Client.Get(ctx, req.NamespacedName, redisCluster)
+	redisCluster, err := r.KubernetesManager.FetchRedisCluster(ctx, req.NamespacedName)
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -77,7 +74,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//endregion
 
 	//region Try to get the ConfigMap for the RedisCluster
-	configMap, err := kubernetes.FetchConfigmap(ctx, r.Client, redisCluster)
+	configMap, err := r.KubernetesManager.FetchConfigmap(ctx, redisCluster)
 	if err != nil && !apierrors.IsNotFound(err) {
 		// This is a legitimate error, we should log the error and exit early, requeuing the reconciliation
 		logger.Error(err, "error checking the existence of ConfigMap")
@@ -87,7 +84,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	if apierrors.IsNotFound(err) {
 		// We successfully checked but the ConfigMap does not exist. We need to create it.
-		configMap, err = kubernetes.CreateConfigMap(ctx, r.Client, redisCluster)
+		configMap, err = r.KubernetesManager.CreateConfigMap(ctx, redisCluster)
 		if err != nil {
 			// Error creating the Configmap, we should log the error and exit early, requeuing the reconciliation
 			logger.Error(err, "error creating ConfigMap for RedisCluster")
@@ -111,7 +108,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		Factor:   1.0,
 		Jitter:   0.1,
 	}, func() error {
-		configMap, err = kubernetes.FetchConfigmap(ctx, r.Client, redisCluster)
+		configMap, err = r.KubernetesManager.FetchConfigmap(ctx, redisCluster)
 		if err != nil {
 			// At this point we definitely expect the statefulset to exist.
 			logger.Error(err, "error finding configMap")
@@ -122,7 +119,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			logger.Error(err, "error setting owner reference of ConfigMap")
 			return err
 		}
-		err = r.Client.Update(ctx, configMap)
+		err = r.KubernetesManager.UpdateResource(ctx, configMap)
 		if err != nil {
 			logger.Error(err, "error updating owner reference of ConfigMap")
 		}
@@ -137,7 +134,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//endregion
 
 	//region Ensure Statefulset
-	masterSSet, replSSets, err := kubernetes.FetchExistingStatefulsets(ctx, r.Client, redisCluster)
+	masterSSet, replSSets, err := r.KubernetesManager.FetchStatefulsets(ctx, redisCluster)
 	if (err != nil && !apierrors.IsNotFound(err)) {
 		// We've got a legitimate error, we should log the error and exit early
 		logger.Error(err, "Could not check whether statefulset exists due to error.")
@@ -148,7 +145,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if apierrors.IsNotFound(err) {
 		// We need to create the Statefulset
-		masterSSet, replSSets, err = kubernetes.CreateStatefulsets(ctx, r.Client, redisCluster)
+		masterSSet, replSSets, err = r.KubernetesManager.CreateStatefulsets(ctx, redisCluster)
 		if err != nil {
 			logger.Error(err, "Failed to create Statefulset for RedisCluster")
 			return ctrl.Result{
@@ -166,7 +163,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//endregion
 
 	//region Set Statefsulset owner reference
-	masterSSet, replSSets, err = kubernetes.FetchExistingStatefulsets(ctx, r.Client, redisCluster)
+	masterSSet, replSSets, err = r.KubernetesManager.FetchStatefulsets(ctx, redisCluster)
 	if err != nil {
 		// At this point we definitely expect the statefulset to exist.
 		logger.Error(err, "Cannot find statefulsets")
@@ -185,7 +182,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				logger.Error(err, fmt.Sprintf("Could not set owner name for master statefulset named %s", masterSSet.Name))
 				return err
 			}
-			err = r.Client.Update(ctx, masterSSet) // ToDo: This is a hack. We should update all statefulsets
+			err = r.KubernetesManager.UpdateResource(ctx, masterSSet) // ToDo: This is a hack. We should update all statefulsets
 			if err != nil {
 				logger.Error(err, fmt.Sprintf("Could not update master statefulset named %s  with owner reference", masterSSet.Name))
 				return err
@@ -204,7 +201,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				logger.Error(err, fmt.Sprintf("Could not set owner name for replica statefulset named %s", statefulset.Name))
 				return err
 			}
-			err = r.Client.Update(ctx, statefulset) // ToDo: This is a hack. We should update all statefulsets
+			err = r.KubernetesManager.UpdateResource(ctx, statefulset) // ToDo: This is a hack. We should update all statefulsets
 			if err != nil {
 				logger.Error(err, fmt.Sprintf("Could not update replica statefulset named %s  with owner reference", statefulset.Name))
 				return err
@@ -222,7 +219,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//endregion
 
 	//region Ensure Service
-	service, err := kubernetes.FetchService(ctx, r.Client, redisCluster)
+	service, err := r.KubernetesManager.FetchService(ctx, redisCluster)
 	if err != nil && !apierrors.IsNotFound(err) {
 		// We've got a legitimate error, we should log the error and exit early
 		logger.Error(err, "Could not check whether service exists due to error.")
@@ -232,7 +229,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	if apierrors.IsNotFound(err) {
 		// We need to create the Statefulset
-		service, err = kubernetes.CreateService(ctx, r.Client, redisCluster)
+		service, err = r.KubernetesManager.CreateService(ctx, redisCluster)
 		if err != nil {
 			logger.Error(err, "Failed to create Service for RedisCluster")
 			return ctrl.Result{
@@ -256,7 +253,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		Factor:   1.0,
 		Jitter:   0.1,
 	}, func() error {
-		service, err = kubernetes.FetchService(ctx, r.Client, redisCluster)
+		service, err = r.KubernetesManager.FetchService(ctx, redisCluster)
 		if err != nil {
 			// At this point we definitely expect the statefulset to exist.
 			logger.Error(err, "Cannot find service")
@@ -267,7 +264,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			logger.Error(err, "Could not set owner reference for service")
 			return err
 		}
-		err = r.Client.Update(ctx, service)
+		err = r.KubernetesManager.UpdateResource(ctx, service)
 		if err != nil {
 			logger.Error(err, "Could not update service with owner reference")
 		}
@@ -292,7 +289,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// and let the reconciliation take care of stabilising the cluster.
 		logger.Info("Scaling up statefulset for Redis Cluster")
 		masterSSet.Spec.Replicas = &replicas
-		err = r.Client.Update(ctx, masterSSet)
+		err = r.KubernetesManager.UpdateResource(ctx, masterSSet)
 		if err != nil {
 			return r.RequeueError(ctx, "Could not update statefulset replicas", err)
 		}
@@ -300,7 +297,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	for _, statefulset := range replSSets {
 		if *statefulset.Spec.Replicas < redisCluster.Spec.Masters {
 			statefulset.Spec.Replicas = &replicas
-			err = r.Client.Update(ctx, statefulset)
+			err = r.KubernetesManager.UpdateResource(ctx, statefulset)
 			if err != nil {
 				return r.RequeueError(ctx, "Could not update statefulset replicas", err)
 			}
@@ -330,7 +327,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			// and let the reconciliation take care of stabilising the cluster.
 			logger.Info("Scaling up statefulset for Redis Cluster")
 			statefulset.Spec.Replicas = &replicas
-			err = r.Client.Update(ctx, statefulset)
+			err = r.KubernetesManager.UpdateResource(ctx, statefulset)
 			if err != nil {
 				return r.RequeueError(ctx, "Could not update statefulset replicas", err)
 			}
@@ -347,7 +344,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	//endregion
 
-	pods, err := kubernetes.FetchRedisPods(ctx, r.Client, redisCluster)
+	pods, err := r.KubernetesManager.FetchRedisPods(ctx, redisCluster)
 	if err != nil {
 		return r.RequeueError(ctx, "Could not fetch pods for redis cluster", err)
 	}

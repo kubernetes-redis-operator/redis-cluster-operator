@@ -8,9 +8,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func FetchRedisPods(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*v1.PodList, error) {
+// FetchRedisPods is a function that fetches a list of Pods from the Kubernetes API server.
+func (km *KubernetesManager) FetchRedisPods(ctx context.Context, cluster *v1alpha1.RedisCluster) (*v1.PodList, error) {
 	pods := &v1.PodList{}
-	err := kubeClient.List(
+	err := km.client.List(
 		ctx,
 		pods,
 		client.MatchingLabelsSelector{Selector: GetPodLabels(cluster).AsSelector()},

@@ -44,7 +44,8 @@ func TestFetchRedisPodsFetchesAllRedisPods(t *testing.T) {
 		},
 	})
 	client := clientBuilder.Build()
-	pods, err := FetchRedisPods(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	pods, err := km.FetchRedisPods(context.TODO(), cluster)
 	if err != nil {
 		t.Fatalf("Received error while trying to getch pods %v", err)
 	}
@@ -87,7 +88,8 @@ func TestFetchRedisPodsFetchesAllRedisPodsExcludingOtherPods(t *testing.T) {
 		},
 	})
 	client := clientBuilder.Build()
-	pods, err := FetchRedisPods(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	pods, err := km.FetchRedisPods(context.TODO(), cluster)
 	if err != nil {
 		t.Fatalf("Received error while trying to getch pods %v", err)
 	}

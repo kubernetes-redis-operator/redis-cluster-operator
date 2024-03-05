@@ -54,7 +54,8 @@ func TestFindExistingConfigMapFetchesConfigMap(t *testing.T) {
 		},
 	}
 
-	configMap, err := FetchConfigmap(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	configMap, err := km.FetchConfigmap(context.TODO(), cluster)
 	if err != nil {
 		t.Fatalf("Expected ConfigMap to be found, but received an error %v", err)
 	}
@@ -95,7 +96,8 @@ func TestFindExistingConfigMapFetchesCorrectConfigMap(t *testing.T) {
 		},
 	}
 
-	configMap, err := FetchConfigmap(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	configMap, err := km.FetchConfigmap(context.TODO(), cluster)
 	if err != nil {
 		t.Fatalf("Expected ConfigMap to be found, but received an error %v", err)
 	}
@@ -118,7 +120,8 @@ func TestFindExistingConfigMapReturnsNotFoundErrorIfNotExists(t *testing.T) {
 		},
 	}
 
-	_, err := FetchConfigmap(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	_, err := km.FetchConfigmap(context.TODO(), cluster)
 	if err == nil {
 		t.Fatalf("Expected not found error but did not receive any error")
 	}
@@ -247,7 +250,8 @@ func TestCreateConfigMap(t *testing.T) {
 	clientBuilder := fake.NewClientBuilder()
 	clientBuilder.WithObjects(&redisCluster)
 	client := clientBuilder.Build()
-	_, err := CreateConfigMap(context.TODO(), client, &redisCluster)
+	km := NewKubernetesManager(client)
+	_, err := km.CreateConfigMap(context.TODO(), &redisCluster)
 	if err != nil {
 		t.Fatalf("Received an error while trying to create Redis ConfigMap")
 	}

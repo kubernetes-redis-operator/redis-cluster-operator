@@ -38,7 +38,8 @@ func TestFindExistingService(t *testing.T) {
 		},
 	}
 
-	service, err := FetchService(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	service, err := km.FetchService(context.TODO(), cluster)
 	if err != nil {
 		t.Fatalf("Expected Service to be found, but received an error %v", err)
 	}
@@ -79,7 +80,8 @@ func TestFindExistingServiceFetchesCorrectService(t *testing.T) {
 		},
 	}
 
-	service, err := FetchService(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	service, err := km.FetchService(context.TODO(), cluster)
 	if err != nil {
 		t.Fatalf("Expected Service to be found, but received an error %v", err)
 	}
@@ -102,7 +104,8 @@ func TestFindExistingServiceReturnsNotFoundErrorIfNotExists(t *testing.T) {
 		},
 	}
 
-	_, err := FetchService(context.TODO(), client, cluster)
+	km := NewKubernetesManager(client)
+	_, err := km.FetchService(context.TODO(), cluster)
 	if err == nil {
 		t.Fatalf("Expected not found error but did not receive any error")
 	}
@@ -143,7 +146,8 @@ func TestCreateService(t *testing.T) {
 		},
 	}
 
-	service, err := CreateService(context.Background(), client, cluster)
+	km := NewKubernetesManager(client)
+	service, err := km.CreateService(context.Background(), cluster)
 	if err != nil {
 		t.Fatalf("Expected no error but received %v", err)
 	}

@@ -8,12 +8,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func FetchService(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*v1.Service, error) {
+// FetchService is a function that fetches a Service object from the Kubernetes API server.
+func (km *KubernetesManager) FetchService(ctx context.Context, cluster *v1alpha1.RedisCluster) (*v1.Service, error) {
 	service := &v1.Service{}
-	err := kubeClient.Get(ctx, types.NamespacedName{
+	err := km.client.Get(ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Name,
 	}, service)
@@ -42,8 +42,9 @@ func createServiceSpec(cluster *v1alpha1.RedisCluster) *v1.Service {
 	return service
 }
 
-func CreateService(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*v1.Service, error) {
+// CreateService is a function that creates a Service object in the Kubernetes API server.
+func (km *KubernetesManager) CreateService(ctx context.Context, cluster *v1alpha1.RedisCluster) (*v1.Service, error) {
 	service := createServiceSpec(cluster)
-	err := kubeClient.Create(ctx, service)
+	err := km.client.Create(ctx, service)
 	return service, err
 }

@@ -20,17 +20,29 @@ import (
 	"context"
 	"testing"
 
+	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
 	cachev1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
-	v1 "k8s.io/api/apps/v1"
-	v12 "k8s.io/api/core/v1"
+	"github.com/serdarkalayci/redis-cluster-operator/internal/kubernetes"
+	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+type mockKubernetes struct { 
+	fetchRedisPodsFunc func(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*corev1.PodList, error)
+}
+
+func (m *mockKubernetes) FetchRedisPods(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*corev1.PodList, error) {
+	return m.fetchRedisPodsFunc(ctx, kubeClient, cluster)
+}
 
 func TestRedisClusterReconciler_Reconcile_ReturnsIfRedisClusterIsNotFound(t *testing.T) {
 	// Register operator types with the runtime scheme.
@@ -38,8 +50,9 @@ func TestRedisClusterReconciler_Reconcile_ReturnsIfRedisClusterIsNotFound(t *tes
 	_ = cachev1alpha1.AddToScheme(s)
 	clientBuilder := fake.ClientBuilder{}
 	// Create a ReconcileMemcached object with the scheme and fake client.
+	km := kubernetes.NewKubernetesManager(clientBuilder.Build())
 	r := &RedisClusterReconciler{
-		Client: clientBuilder.Build(),
+		KubernetesManager: km,
 		Scheme: s,
 	}
 
@@ -62,11 +75,11 @@ func TestRedisClusterReconciler_Reconcile_ReturnsErrorIfCannotGetStatefulset(t *
 	s := scheme.Scheme
 	_ = cachev1alpha1.AddToScheme(s)
 	clientBuilder := fake.NewClientBuilder()
-	client := clientBuilder.Build()
 
 	// Create a ReconcileMemcached object with the scheme and fake client.
+	km := kubernetes.NewKubernetesManager(clientBuilder.Build())
 	r := &RedisClusterReconciler{
-		Client: client,
+		KubernetesManager: km,
 		Scheme: s,
 	}
 
@@ -101,10 +114,10 @@ func TestRedisClusterReconciler_Reconcile_CreatesStatefulsetIfDoesntExist(t *tes
 		},
 	})
 	client := clientBuilder.Build()
-
 	// Create a ReconcileMemcached object with the scheme and fake client.
+	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
-		Client: client,
+		KubernetesManager: km,
 		Scheme: s,
 	}
 
@@ -124,7 +137,7 @@ func TestRedisClusterReconciler_Reconcile_CreatesStatefulsetIfDoesntExist(t *tes
 		}
 	}
 
-	sts := &v1.StatefulSet{}
+	sts := &appsv1.StatefulSet{}
 	err := client.Get(context.TODO(), types.NamespacedName{
 		Name:      "redis-cluster-master",
 		Namespace: "default",
@@ -150,20 +163,21 @@ func TestRedisClusterReconciler_Reconcile_DoesNotFailIfStatefulsetExists(t *test
 			Masters:           3,
 			ReplicasPerMaster: 1,
 		},
-	}, &v1.StatefulSet{
+	}, &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "redis-cluster",
 			Namespace: "default",
 		},
-		Spec: v1.StatefulSetSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
 		},
 	})
 	client := clientBuilder.Build()
 
 	// Create a ReconcileMemcached object with the scheme and fake client.
+	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
-		Client: client,
+		KubernetesManager: km,
 		Scheme: s,
 	}
 
@@ -178,19 +192,15 @@ func TestRedisClusterReconciler_Reconcile_DoesNotFailIfStatefulsetExists(t *test
 
 	for i := 0; i < 8; i++ {
 		_, err := r.Reconcile(context.TODO(), req)
-		if err != nil {
-			t.Fatalf("reconcile: (%v)", err)
-		}
+		assert.NoError(t, err)
 	}
 
-	sts := &v1.StatefulSet{}
+	sts := &appsv1.StatefulSet{}
 	err := client.Get(context.TODO(), types.NamespacedName{
 		Name:      "redis-cluster",
 		Namespace: "default",
 	}, sts)
-	if err != nil {
-		t.Fatalf("Failed to fetch created Statefulset %v", err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestRedisClusterReconciler_Reconcile_StatefulsetHasOwnerReferenceSetToRedisCluster(t *testing.T) {
@@ -215,8 +225,9 @@ func TestRedisClusterReconciler_Reconcile_StatefulsetHasOwnerReferenceSetToRedis
 	client := clientBuilder.Build()
 
 	// Create a ReconcileMemcached object with the scheme and fake client.
+	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
-		Client: client,
+		KubernetesManager: km,
 		Scheme: s,
 	}
 
@@ -238,7 +249,7 @@ func TestRedisClusterReconciler_Reconcile_StatefulsetHasOwnerReferenceSetToRedis
 		}
 	}
 
-	sts := &v1.StatefulSet{}
+	sts := &appsv1.StatefulSet{}
 	err := client.Get(context.TODO(), types.NamespacedName{
 		Name:      "redis-cluster-master",
 		Namespace: "default",
@@ -276,8 +287,9 @@ func TestRedisClusterReconciler_Reconcile_CreatesConfigMapForRedisCluster(t *tes
 	client := clientBuilder.Build()
 
 	// Create a ReconcileMemcached object with the scheme and fake client.
+	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
-		Client: client,
+		KubernetesManager: km,
 		Scheme: s,
 	}
 
@@ -299,7 +311,7 @@ func TestRedisClusterReconciler_Reconcile_CreatesConfigMapForRedisCluster(t *tes
 		}
 	}
 
-	configMap := &v12.ConfigMap{}
+	configMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{
 		Name:      "redis-cluster-config",
 		Namespace: "default",
@@ -332,7 +344,7 @@ func TestRedisClusterReconciler_Reconcile_DoesNotFailIfConfigMapExists(t *testin
 	}
 
 	clientBuilder := fake.NewClientBuilder()
-	clientBuilder.WithObjects(redisCluster, &v12.ConfigMap{
+	clientBuilder.WithObjects(redisCluster, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "redis-cluster-config",
 			Namespace: "default",
@@ -344,8 +356,9 @@ func TestRedisClusterReconciler_Reconcile_DoesNotFailIfConfigMapExists(t *testin
 	client := clientBuilder.Build()
 
 	// Create a ReconcileMemcached object with the scheme and fake client.
+	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
-		Client: client,
+		KubernetesManager: km,
 		Scheme: s,
 	}
 
@@ -367,7 +380,7 @@ func TestRedisClusterReconciler_Reconcile_DoesNotFailIfConfigMapExists(t *testin
 		}
 	}
 
-	configMap := &v12.ConfigMap{}
+	configMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{
 		Name:      "redis-cluster-config",
 		Namespace: "default",
@@ -406,8 +419,9 @@ func TestRedisClusterReconciler_Reconcile_ConfigMapHasOwnerReferenceSetToRedisCl
 	client := clientBuilder.Build()
 
 	// Create a ReconcileMemcached object with the scheme and fake client.
+	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
-		Client: client,
+		KubernetesManager: km,
 		Scheme: s,
 	}
 
@@ -429,7 +443,7 @@ func TestRedisClusterReconciler_Reconcile_ConfigMapHasOwnerReferenceSetToRedisCl
 		}
 	}
 
-	configmap := &v12.ConfigMap{}
+	configmap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{
 		Name:      "redis-cluster-config",
 		Namespace: "default",

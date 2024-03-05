@@ -9,12 +9,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func FetchConfigmap(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*v1.ConfigMap, error) {
+// FetchConfigmap is a function that fetches a ConfigMap object from the Kubernetes API server.
+func (km *KubernetesManager) FetchConfigmap(ctx context.Context, cluster *v1alpha1.RedisCluster) (*v1.ConfigMap, error) {
 	configMap := &v1.ConfigMap{}
-	err := kubeClient.Get(ctx, types.NamespacedName{
+	err := km.client.Get(ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      getConfigMapName(cluster),
 	}, configMap)
@@ -80,8 +80,9 @@ func createConfigMapSpec(cluster *v1alpha1.RedisCluster) *v1.ConfigMap {
 	return configMap
 }
 
-func CreateConfigMap(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*v1.ConfigMap, error) {
+// CreateConfigMap is a function that creates a ConfigMap object in the Kubernetes API server.
+func (km *KubernetesManager) CreateConfigMap(ctx context.Context, cluster *v1alpha1.RedisCluster) (*v1.ConfigMap, error) {
 	configMap := createConfigMapSpec(cluster)
-	err := kubeClient.Create(ctx, configMap)
+	err := km.client.Create(ctx, configMap)
 	return configMap, err
 }

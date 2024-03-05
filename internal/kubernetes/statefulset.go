@@ -13,7 +13,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -21,12 +20,14 @@ const (
 	RedisNodeComponentLabel       = "rediscluster.kuro.io/cluster-component"
 )
 
+// GetStatefulSetLabels is a function that returns the labels for a StatefulSet object.
 func GetStatefulSetLabels(cluster *v1alpha1.RedisCluster) labels.Set {
 	return labels.Set{
 		RedisNodeNameStatefulsetLabel: cluster.Name,
 	}
 }
 
+// GetPodLabels is a function that returns the labels for a Pod object.
 func GetPodLabels(cluster *v1alpha1.RedisCluster) labels.Set {
 	return labels.Set{
 		RedisNodeNameStatefulsetLabel: cluster.Name,
@@ -34,11 +35,12 @@ func GetPodLabels(cluster *v1alpha1.RedisCluster) labels.Set {
 	}
 }
 
-func FetchExistingStatefulsets(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
+// FetchExistingStatefulsets is a function that fetches the existing StatefulSet objects from the Kubernetes API server.
+func (km *KubernetesManager) FetchStatefulsets(ctx context.Context, cluster *v1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
 	var errslice []error
 	var replicass = make ([]*appsv1.StatefulSet, cluster.Spec.ReplicasPerMaster)
 	masterss := &appsv1.StatefulSet{}
-	err := kubeClient.Get(ctx, types.NamespacedName{
+	err := km.client.Get(ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Name + "-master",
 	}, masterss)
@@ -47,7 +49,7 @@ func FetchExistingStatefulsets(ctx context.Context, kubeClient client.Client, cl
 	}
 	for i := 0; i < int(cluster.Spec.ReplicasPerMaster); i++ {
 		replss := &appsv1.StatefulSet{}
-		err := kubeClient.Get(ctx, types.NamespacedName{
+		err := km.client.Get(ctx, types.NamespacedName{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name + fmt.Sprintf("-repl-%d", i),
 		}, replss)
@@ -60,12 +62,13 @@ func FetchExistingStatefulsets(ctx context.Context, kubeClient client.Client, cl
 	return masterss, replicass, fetchError
 }
 
-func CreateStatefulsets(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
+// CreateStatefulsets is a function that creates StatefulSet objects in the Kubernetes API server.
+func (km *KubernetesManager) CreateStatefulsets(ctx context.Context, cluster *v1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
 	var errslice []error
 	var replicass = make ([]*appsv1.StatefulSet, cluster.Spec.ReplicasPerMaster)
 	masterss := createStatefulsetSpec(cluster, "master")
 	masterss.Labels["rediscluster.kuro.io/cluster-role"] = "master"
-	err := kubeClient.Create(ctx, masterss)
+	err := km.client.Create(ctx, masterss)
 	if err != nil {
 		errslice = append(errslice, err)
 		return nil, nil, err
@@ -75,7 +78,7 @@ func CreateStatefulsets(ctx context.Context, kubeClient client.Client, cluster *
 	for i := 0; i < int(cluster.Spec.ReplicasPerMaster) && len(errslice) == 0; i++ {
 		replss := createStatefulsetSpec(cluster, fmt.Sprintf("repl-%d", i))
 		replss.Labels["rediscluster.kuro.io/cluster-role"] = "replica"
-		err := kubeClient.Create(ctx, replss)
+		err := km.client.Create(ctx, replss)
 		if err != nil {
 			errslice = append(errslice, err)
 			break
