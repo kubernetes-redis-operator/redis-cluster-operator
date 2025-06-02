@@ -20,9 +20,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
-	cachev1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
-	"github.com/serdarkalayci/redis-cluster-operator/internal/kubernetes"
+	"github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
+	cachev1alpha1 "github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
+	"github.com/kubernetes-redis-operator/redis-cluster-operator/internal/kubernetes"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type mockKubernetes struct { 
+type mockKubernetes struct {
 	fetchRedisPodsFunc func(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*corev1.PodList, error)
 }
 
@@ -53,7 +53,7 @@ func TestRedisClusterReconciler_Reconcile_ReturnsIfRedisClusterIsNotFound(t *tes
 	km := kubernetes.NewKubernetesManager(clientBuilder.Build())
 	r := &RedisClusterReconciler{
 		KubernetesManager: km,
-		Scheme: s,
+		Scheme:            s,
 	}
 
 	// Mock request to simulate Reconcile() being called on an event for a
@@ -80,7 +80,7 @@ func TestRedisClusterReconciler_Reconcile_ReturnsErrorIfCannotGetStatefulset(t *
 	km := kubernetes.NewKubernetesManager(clientBuilder.Build())
 	r := &RedisClusterReconciler{
 		KubernetesManager: km,
-		Scheme: s,
+		Scheme:            s,
 	}
 
 	// Mock request to simulate Reconcile() being called on an event for a
@@ -118,7 +118,7 @@ func TestRedisClusterReconciler_Reconcile_CreatesStatefulsetIfDoesntExist(t *tes
 	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
 		KubernetesManager: km,
-		Scheme: s,
+		Scheme:            s,
 	}
 
 	// Mock request to simulate Reconcile() being called on an event for a
@@ -178,7 +178,7 @@ func TestRedisClusterReconciler_Reconcile_DoesNotFailIfStatefulsetExists(t *test
 	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
 		KubernetesManager: km,
-		Scheme: s,
+		Scheme:            s,
 	}
 
 	// Mock request to simulate Reconcile() being called on an event for a
@@ -228,7 +228,7 @@ func TestRedisClusterReconciler_Reconcile_StatefulsetHasOwnerReferenceSetToRedis
 	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
 		KubernetesManager: km,
-		Scheme: s,
+		Scheme:            s,
 	}
 
 	// Mock request to simulate Reconcile() being called on an event for a
@@ -290,7 +290,7 @@ func TestRedisClusterReconciler_Reconcile_CreatesConfigMapForRedisCluster(t *tes
 	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
 		KubernetesManager: km,
-		Scheme: s,
+		Scheme:            s,
 	}
 
 	// Mock request to simulate Reconcile() being called on an event for a
@@ -359,7 +359,7 @@ func TestRedisClusterReconciler_Reconcile_DoesNotFailIfConfigMapExists(t *testin
 	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
 		KubernetesManager: km,
-		Scheme: s,
+		Scheme:            s,
 	}
 
 	// Mock request to simulate Reconcile() being called on an event for a
@@ -422,7 +422,7 @@ func TestRedisClusterReconciler_Reconcile_ConfigMapHasOwnerReferenceSetToRedisCl
 	km := kubernetes.NewKubernetesManager(client)
 	r := &RedisClusterReconciler{
 		KubernetesManager: km,
-		Scheme: s,
+		Scheme:            s,
 	}
 
 	// Mock request to simulate Reconcile() being called on an event for a

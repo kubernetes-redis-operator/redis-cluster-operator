@@ -6,7 +6,7 @@ import (
 	"sort"
 	"testing"
 
-	cachev1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
+	cachev1alpha1 "github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

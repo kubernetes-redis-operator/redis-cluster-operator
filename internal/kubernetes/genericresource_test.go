@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	cachev1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
+	cachev1alpha1 "github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,14 +27,13 @@ func TestKubernetesManager_UpdateResource(t *testing.T) {
 
 	client := clientBuilder.Build()
 
-
 	km := NewKubernetesManager(client)
 
-	err := km.UpdateResource(context.TODO(), &v1.ConfigMap{		
+	err := km.UpdateResource(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-		Name:      "redis-cluster-config",
-		Namespace: "default",
-		Labels:   map[string]string{"app": "redis-cluster"},
+			Name:      "redis-cluster-config",
+			Namespace: "default",
+			Labels:    map[string]string{"app": "redis-cluster"},
 		},
 	})
 	assert.NoError(t, err)

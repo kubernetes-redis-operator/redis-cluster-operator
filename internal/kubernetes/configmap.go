@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
+	"github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

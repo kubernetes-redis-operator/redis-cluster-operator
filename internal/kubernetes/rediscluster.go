@@ -3,7 +3,7 @@ package kubernetes
 import (
 	"context"
 
-	redisclusterv1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
+	redisclusterv1alpha1 "github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 )
 

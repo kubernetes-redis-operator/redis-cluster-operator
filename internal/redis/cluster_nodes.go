@@ -6,7 +6,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
+	"github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
 )
 
 type ClusterNodes struct {

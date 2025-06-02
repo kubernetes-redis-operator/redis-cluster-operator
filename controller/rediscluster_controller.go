@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	redis_internal "github.com/serdarkalayci/redis-cluster-operator/internal/redis"
-	"github.com/serdarkalayci/redis-cluster-operator/internal/utils"
+	redis_internal "github.com/kubernetes-redis-operator/redis-cluster-operator/internal/redis"
+	"github.com/kubernetes-redis-operator/redis-cluster-operator/internal/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,13 +34,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	redisclusterv1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
+	redisclusterv1alpha1 "github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
 )
 
 // RedisClusterReconciler reconciles a RedisCluster object
 type RedisClusterReconciler struct {
-	KubernetesManager    IKubernetesManager
-	Scheme *runtime.Scheme
+	KubernetesManager IKubernetesManager
+	Scheme            *runtime.Scheme
 }
 
 //+kubebuilder:rbac:groups=rediscluster.kuro.io,resources=redisclusters,verbs=get;list;watch;create;update;patch;delete
@@ -135,7 +135,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	//region Ensure Statefulset
 	masterSSet, replSSets, err := r.KubernetesManager.FetchStatefulsets(ctx, redisCluster)
-	if (err != nil && !apierrors.IsNotFound(err)) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		// We've got a legitimate error, we should log the error and exit early
 		logger.Error(err, "Could not check whether statefulset exists due to error.")
 		return ctrl.Result{
@@ -177,17 +177,17 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		Factor:   1.0,
 		Jitter:   0.1,
 	}, func() error {
-			err = ctrl.SetControllerReference(redisCluster, masterSSet, r.Scheme) // ToDo: This is a hack. We should update all statefulsets
-			if err != nil {
-				logger.Error(err, fmt.Sprintf("Could not set owner name for master statefulset named %s", masterSSet.Name))
-				return err
-			}
-			err = r.KubernetesManager.UpdateResource(ctx, masterSSet) // ToDo: This is a hack. We should update all statefulsets
-			if err != nil {
-				logger.Error(err, fmt.Sprintf("Could not update master statefulset named %s  with owner reference", masterSSet.Name))
-				return err
-			}
+		err = ctrl.SetControllerReference(redisCluster, masterSSet, r.Scheme) // ToDo: This is a hack. We should update all statefulsets
+		if err != nil {
+			logger.Error(err, fmt.Sprintf("Could not set owner name for master statefulset named %s", masterSSet.Name))
 			return err
+		}
+		err = r.KubernetesManager.UpdateResource(ctx, masterSSet) // ToDo: This is a hack. We should update all statefulsets
+		if err != nil {
+			logger.Error(err, fmt.Sprintf("Could not update master statefulset named %s  with owner reference", masterSSet.Name))
+			return err
+		}
+		return err
 	})
 	for _, statefulset := range replSSets {
 		err = retry.RetryOnConflict(wait.Backoff{
@@ -207,9 +207,9 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return err
 			}
 			return err
-			
-			})
-		}
+
+		})
+	}
 	if err != nil {
 		logger.Error(err, "Could not set owner reference for statefulset")
 		return ctrl.Result{
@@ -313,13 +313,12 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}, nil
 	}
 
-
 	//endregion
 
 	//region Check if cluster needs to be scaled in
 	scaleIn := false
 	// First we have to rebalance the masters if we have to scale in
-	
+
 	for _, statefulset := range replSSets {
 		if *statefulset.Spec.Replicas > redisCluster.Spec.Masters {
 			// The statefulset has less replicas than are needed for the cluster.
@@ -466,14 +465,14 @@ func (r *RedisClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 type clusterInfo struct {
 	redisCluster *redisclusterv1alpha1.RedisCluster
-	masterSS *appsv1.StatefulSet
-	replicaSS []*appsv1.StatefulSet
-	masterPods []*corev1.Pod
-	replicaPods []*corev1.Pod
-	cm *corev1.ConfigMap
-	scr *corev1.Secret
+	masterSS     *appsv1.StatefulSet
+	replicaSS    []*appsv1.StatefulSet
+	masterPods   []*corev1.Pod
+	replicaPods  []*corev1.Pod
+	cm           *corev1.ConfigMap
+	scr          *corev1.Secret
 }
 
-func decorateRedisCluster(rdcl *redisclusterv1alpha1.RedisCluster)  {
+func decorateRedisCluster(rdcl *redisclusterv1alpha1.RedisCluster) {
 
 }

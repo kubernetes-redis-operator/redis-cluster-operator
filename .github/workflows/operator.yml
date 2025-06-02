@@ -77,7 +77,7 @@ jobs:
           push: ${{ github.event_name == 'release' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=docker.io/serdarkalayci/redis-cluster-operator:latest
+          cache-from: type=registry,ref=docker.io/kubernetes-redis-operator/redis-cluster-operator:latest
           cache-to: type=inline
 
   release:

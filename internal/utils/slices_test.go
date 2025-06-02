@@ -58,7 +58,7 @@ func TestMergeContainerPorts(t *testing.T) {
 func TestMergeVolumes(t *testing.T) {
 	originalVolumes := []v1.Volume{
 		{
-			Name:      "foobar",
+			Name: "foobar",
 			VolumeSource: v1.VolumeSource{
 				ConfigMap: &v1.ConfigMapVolumeSource{
 					LocalObjectReference: v1.LocalObjectReference{
@@ -70,7 +70,7 @@ func TestMergeVolumes(t *testing.T) {
 	}
 	overrideVolumes := []v1.Volume{
 		{
-			Name:      "foobar",
+			Name: "foobar",
 			VolumeSource: v1.VolumeSource{
 				ConfigMap: &v1.ConfigMapVolumeSource{
 					LocalObjectReference: v1.LocalObjectReference{
@@ -80,7 +80,7 @@ func TestMergeVolumes(t *testing.T) {
 			},
 		},
 		{
-			Name:      "new-foo",
+			Name: "new-foo",
 			VolumeSource: v1.VolumeSource{
 				HostPath: &v1.HostPathVolumeSource{
 					Path: "/data",

@@ -1,6 +1,6 @@
 # Redis Cluster Operator
 
-[![Operator Tests](https://github.com/serdarkalayci/redis-cluster-operator/actions/workflows/operator.yml/badge.svg)](https://github.com/serdarkalayci/redis-cluster-operator/actions/workflows/operator.yml)   [![Coverage Status](https://coveralls.io/repos/github/serdarkalayci/redis-cluster-operator/badge.svg?branch=main)](https://coveralls.io/github/serdarkalayci/redis-cluster-operator?branch=main)   [![Go Report Card](https://goreportcard.com/badge/github.com/serdarkalayci/redis-cluster-operator)](https://goreportcard.com/report/github.com/serdarkalayci/redis-cluster-operator)   [![CodeQL](https://github.com/serdarkalayci/redis-cluster-operator/actions/workflows/codeql.yml/badge.svg)](https://github.com/serdarkalayci/redis-cluster-operator/actions/workflows/codeql.yml)   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Operator Tests](https://github.com/kubernetes-redis-operator/redis-cluster-operator/actions/workflows/operator.yml/badge.svg)](https://github.com/kubernetes-redis-operator/redis-cluster-operator/actions/workflows/operator.yml)   [![Coverage Status](https://coveralls.io/repos/github/kubernetes-redis-operator/redis-cluster-operator/badge.svg?branch=main)](https://coveralls.io/github/kubernetes-redis-operator/redis-cluster-operator?branch=main)   [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes-redis-operator/redis-cluster-operator)](https://goreportcard.com/report/github.com/kubernetes-redis-operator/redis-cluster-operator)   [![CodeQL](https://github.com/kubernetes-redis-operator/redis-cluster-operator/actions/workflows/codeql.yml/badge.svg)](https://github.com/kubernetes-redis-operator/redis-cluster-operator/actions/workflows/codeql.yml)   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 The Redis Cluster Operator runs Redis Clusters on Kubernetes.
 
@@ -41,7 +41,7 @@ The origin bundle works in cluster mode, and will manage all RedisClusters creat
 
 To install or upgrade the operator 
 ```shell
-kubectl apply -f https://github.com/serdarkalayci/redis-cluster-operator/releases/latest/download/bundle.yml
+kubectl apply -f https://github.com/kubernetes-redis-operator/redis-cluster-operator/releases/latest/download/bundle.yml
 ```
 
 This will install the Operator in a new namespace `redis-cluster-operator`. 

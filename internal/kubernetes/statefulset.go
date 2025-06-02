@@ -6,8 +6,8 @@ import (
 
 	"errors"
 
-	"github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
-	"github.com/serdarkalayci/redis-cluster-operator/internal/utils"
+	"github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
+	"github.com/kubernetes-redis-operator/redis-cluster-operator/internal/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +38,7 @@ func GetPodLabels(cluster *v1alpha1.RedisCluster) labels.Set {
 // FetchExistingStatefulsets is a function that fetches the existing StatefulSet objects from the Kubernetes API server.
 func (km *KubernetesManager) FetchStatefulsets(ctx context.Context, cluster *v1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
 	var errslice []error
-	var replicass = make ([]*appsv1.StatefulSet, cluster.Spec.ReplicasPerMaster)
+	var replicass = make([]*appsv1.StatefulSet, cluster.Spec.ReplicasPerMaster)
 	masterss := &appsv1.StatefulSet{}
 	err := km.client.Get(ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -65,7 +65,7 @@ func (km *KubernetesManager) FetchStatefulsets(ctx context.Context, cluster *v1a
 // CreateStatefulsets is a function that creates StatefulSet objects in the Kubernetes API server.
 func (km *KubernetesManager) CreateStatefulsets(ctx context.Context, cluster *v1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
 	var errslice []error
-	var replicass = make ([]*appsv1.StatefulSet, cluster.Spec.ReplicasPerMaster)
+	var replicass = make([]*appsv1.StatefulSet, cluster.Spec.ReplicasPerMaster)
 	masterss := createStatefulsetSpec(cluster, "master")
 	masterss.Labels["rediscluster.kuro.io/cluster-role"] = "master"
 	err := km.client.Create(ctx, masterss)

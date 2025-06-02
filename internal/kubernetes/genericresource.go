@@ -7,6 +7,6 @@ import (
 )
 
 // UpdateResource updates the given Kubernetes resource.
-func (km *KubernetesManager) UpdateResource(ctx context.Context, obj client.Object) (error) {
+func (km *KubernetesManager) UpdateResource(ctx context.Context, obj client.Object) error {
 	return km.client.Update(ctx, obj)
 }

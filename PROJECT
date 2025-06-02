@@ -5,7 +5,7 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: redis-operator
-repo: github.com/serdarkalayci/redis-cluster-operator
+repo: github.com/kubernetes-redis-operator/redis-cluster-operator
 resources:
 - api:
     crdVersion: v1
@@ -14,6 +14,6 @@ resources:
   domain: kuro.io
   group: cache
   kind: RedisCluster
-  path: github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1
+  path: github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

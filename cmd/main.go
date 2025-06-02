@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	v1alpha1 "github.com/serdarkalayci/redis-cluster-operator/api/v1alpha1"
-	"github.com/serdarkalayci/redis-cluster-operator/controller"
-	"github.com/serdarkalayci/redis-cluster-operator/internal/kubernetes"
+	v1alpha1 "github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
+	"github.com/kubernetes-redis-operator/redis-cluster-operator/controller"
+	"github.com/kubernetes-redis-operator/redis-cluster-operator/internal/kubernetes"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -81,8 +81,8 @@ func main() {
 
 	km := kubernetes.NewKubernetesManager(mgr.GetClient())
 	if err = (&controller.RedisClusterReconciler{
-		KubernetesManager:     km,
-		Scheme: mgr.GetScheme(),
+		KubernetesManager: km,
+		Scheme:            mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RedisCluster")
 		os.Exit(1)
