@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/go-redis/redismock/v8 v8.0.6
+	github.com/go-redis/redismock/v8 v8.11.5
 	github.com/imdario/mergo v0.3.12
 	github.com/stretchr/testify v1.7.0
 	k8s.io/api v0.23.0
