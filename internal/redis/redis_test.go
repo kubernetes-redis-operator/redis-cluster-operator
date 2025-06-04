@@ -247,7 +247,7 @@ func TestNode_IsMasterReturnsFalseIfReplica(t *testing.T) {
 
 // endregion
 
-func TestGetOrdindal(t *testing.T) {
+func TestGetOrdinal(t *testing.T) {
 	node := Node{
 		PodDetails: &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -255,7 +255,7 @@ func TestGetOrdindal(t *testing.T) {
 			},
 		},
 	}
-	ordinal := node.GetOrdindal()
+	ordinal := node.GetOrdinal()
 	if ordinal != 11 {
 		t.Fatalf("Ordinal incorrectly calculated. Expected 11, Got: %d", ordinal)
 	}
@@ -266,7 +266,7 @@ func TestGetOrdindal(t *testing.T) {
 			},
 		},
 	}
-	ordinal = node.GetOrdindal()
+	ordinal = node.GetOrdinal()
 	if ordinal != 8 {
 		t.Fatalf("Ordinal incorrectly calculated. Expected 8, Got: %d", ordinal)
 	}

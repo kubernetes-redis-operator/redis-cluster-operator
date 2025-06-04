@@ -345,3 +345,23 @@ func (c *ClusterNodes) CalculateRebalance(ctx context.Context, cluster *v1alpha1
 	}
 	return result
 }
+
+func (c *ClusterNodes) CalculateRemoveNodes(ctx context.Context, cluster *v1alpha1.RedisCluster) []slotMoveMap {
+	masters := c.Nodes
+	sort.Slice(masters, func(i, j int) bool {
+		return len(masters[i].NodeAttributes.GetSlots()) > len(masters[j].NodeAttributes.GetSlots())
+	})
+	var result []slotMoveMap
+	stealMap := map[*Node][]int32{}
+	nodes := c.GetMasters()
+	// we have to find the nodes which are the ones to be removed, from bottom of the statefulset
+	for _, node := range nodes {
+		ordinal := node.GetOrdinal()
+		if ordinal >= cluster.Spec.Masters {
+			// we'll have to remove this node, therefore we should add its slots to steal list
+			slots := node.NodeAttributes.GetSlots()
+			stealMap[node] = slots
+		}
+	}
+	return result
+}
