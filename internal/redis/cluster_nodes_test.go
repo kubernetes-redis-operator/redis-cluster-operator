@@ -816,3 +816,87 @@ func TestClusterNodes_CalculateRebalanceWhenTwoNodesNeedToMoveSlots(t *testing.T
 		}
 	}
 }
+
+func TestClusterNodes_CalculateRemoveNodes(t *testing.T) {
+	var nodes []*Node
+	mocks := map[string]*redismock.ClientMock{}
+	for i := 0; i <= 2; i++ {
+		var node *Node
+		var err error
+		switch i {
+		case 0:
+			node, err = NewNode(context.TODO(), &redis.Options{
+				Addr: fmt.Sprintf("10.20.30.4%d:6379", i),
+			}, &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rediscluster-" + strconv.FormatInt(int64(i), 10),
+					Namespace: "default",
+				},
+			}, func(opt *redis.Options) *redis.Client {
+				client, mock := redismock.NewClientMock()
+				mock.ExpectClusterNodes().SetVal(`5dbeafc760e4ec355f007b2ce10c690a56306dc8 10.20.30.40:6379@16379 myself,master - 0 1653479781000 16 connected 0-5461
+4e70ffa7e012ecec890b25f52fbc3d2e8edd89ad 10.20.30.41:6379@16379 master - 0 1653479781745 16 connected 5462-10926
+0465e428668773fc3bbeb02150bbd4324e409fe0 10.20.30.42:6379@16379 master - 0 1653479781544 16 connected 10927-16383
+`)
+				mocks["5dbeafc760e4ec355f007b2ce10c690a56306dc8"] = &mock
+				return client
+			})
+		case 1:
+			node, err = NewNode(context.TODO(), &redis.Options{
+				Addr: fmt.Sprintf("10.20.30.4%d:6379", i),
+			}, &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rediscluster-" + strconv.FormatInt(int64(i), 10),
+					Namespace: "default",
+				},
+			}, func(opt *redis.Options) *redis.Client {
+				client, mock := redismock.NewClientMock()
+				// Early return for this node
+				mock.ExpectClusterNodes().SetVal(`5dbeafc760e4ec355f007b2ce10c690a56306dc8 10.20.30.40:6379@16379 master - 0 1653479781000 16 connected 0-5461
+4e70ffa7e012ecec890b25f52fbc3d2e8edd89ad 10.20.30.41:6379@16379 myself,master - 0 1653479781745 16 connected 5462-10926
+0465e428668773fc3bbeb02150bbd4324e409fe0 10.20.30.42:6379@16379 master - 0 1653479781544 16 connected 10927-16383
+`)
+				mocks["4e70ffa7e012ecec890b25f52fbc3d2e8edd89ad"] = &mock
+				return client
+			})
+		case 2:
+			node, err = NewNode(context.TODO(), &redis.Options{
+				Addr: fmt.Sprintf("10.20.30.4%d:6379", i),
+			}, &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rediscluster-" + strconv.FormatInt(int64(i), 10),
+					Namespace: "default",
+				},
+			}, func(opt *redis.Options) *redis.Client {
+				client, mock := redismock.NewClientMock()
+				mock.ExpectClusterNodes().SetVal(`5dbeafc760e4ec355f007b2ce10c690a56306dc8 10.20.30.40:6379@16379 master - 0 1653479781000 16 connected 0-5461
+4e70ffa7e012ecec890b25f52fbc3d2e8edd89ad 10.20.30.41:6379@16379 master - 0 1653479781745 16 connected 5462-10926
+0465e428668773fc3bbeb02150bbd4324e409fe0 10.20.30.42:6379@16379 myself,master - 0 1653479781544 16 connected 10927-16383
+`)
+				mocks["0465e428668773fc3bbeb02150bbd4324e409fe0"] = &mock
+				return client
+			})
+		}
+
+		if err != nil {
+			t.Fatalf("Got error whil trying to create node. %v", err)
+		}
+		nodes = append(nodes, node)
+	}
+
+	clusterNodes := ClusterNodes{
+		Nodes: nodes,
+	}
+	slotMoves := clusterNodes.CalculateRemoveNodes(context.TODO(), &v1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.RedisClusterSpec{
+			Masters: 2,
+		},
+	})
+	for _, slotMoveMap := range slotMoves {
+		fmt.Println(slotMoveMap)
+	}
+}

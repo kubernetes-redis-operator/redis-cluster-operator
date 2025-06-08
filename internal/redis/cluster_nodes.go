@@ -354,6 +354,7 @@ func (c *ClusterNodes) CalculateRemoveNodes(ctx context.Context, cluster *v1alph
 	var result []slotMoveMap
 	stealMap := map[*Node][]int32{}
 	nodes := c.GetMasters()
+	totalNumberOfSlots := 0
 	// we have to find the nodes which are the ones to be removed, from bottom of the statefulset
 	for _, node := range nodes {
 		ordinal := node.GetOrdinal()
@@ -361,7 +362,45 @@ func (c *ClusterNodes) CalculateRemoveNodes(ctx context.Context, cluster *v1alph
 			// we'll have to remove this node, therefore we should add its slots to steal list
 			slots := node.NodeAttributes.GetSlots()
 			stealMap[node] = slots
+			totalNumberOfSlots += len(slots)
 		}
+	}
+	// Now we have a list of the slots to be moved from the masters which are to be removed to the masters which are to be kept
+	// We should calculate a move map that will provide a fair share
+	slotsPerMaster := int(math.Ceil(float64(totalNumberOfSlots) / float64(cluster.Spec.Masters)))
+	lastIndex := 0
+	
+	for i:=0; i < int(cluster.Spec.Masters); i++ {
+		startIndex := slotsPerMaster * i
+		endIndex := startIndex + slotsPerMaster
+		if endIndex > totalNumberOfSlots {
+			endIndex = totalNumberOfSlots
+		}
+		for j := startIndex; j < endIndex; j++ {
+			if j >= len(masters) {
+				break
+			}
+			node := masters[j]
+			if len(stealMap) == 0 {
+				break
+			}
+			// We need to find a node which has slots to steal from
+			for stealNode, stealSlots := range stealMap {
+				if len(stealSlots) == 0 {
+					continue
+				}
+				slotsToSteal := stealSlots[:1] // we take one slot at a time
+				stealMap[stealNode] = stealSlots[1:]
+				result = append(result, slotMoveMap{
+					Source:      stealNode,
+					Destination: node,
+					Slots:       slotsToSteal,
+				})
+				lastIndex = j
+				break
+			}
+		}
+		lastIndex++
 	}
 	return result
 }
