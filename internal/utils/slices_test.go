@@ -212,7 +212,7 @@ func TestMergeContainers(t *testing.T) {
 	}
 
 	if redisContainer.Image != "redis:5" {
-		t.Fatalf("Redis image not correctly overriden")
+		t.Fatalf("Redis image not correctly overridden")
 	}
 
 	var redisPort v1.ContainerPort

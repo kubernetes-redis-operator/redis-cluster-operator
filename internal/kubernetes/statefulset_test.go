@@ -160,7 +160,7 @@ func TestCreateStatefulset_CanCreateStatefulset(t *testing.T) {
 	km := NewKubernetesManager(client)
 	_, _, err := km.CreateStatefulsets(context.TODO(), cluster)
 	if err != nil {
-		t.Fatalf("Expected Statefulset to be created sucessfully, but received an error %v", err)
+		t.Fatalf("Expected Statefulset to be created successfully, but received an error %v", err)
 	}
 
 	statefulset := &v1.StatefulSet{}
