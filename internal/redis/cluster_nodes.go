@@ -352,55 +352,64 @@ func (c *ClusterNodes) CalculateRemoveNodes(ctx context.Context, cluster *v1alph
 		return len(masters[i].NodeAttributes.GetSlots()) > len(masters[j].NodeAttributes.GetSlots())
 	})
 	var result []slotMoveMap
-	stealMap := map[*Node][]int32{}
+	type NodeStealMap struct {
+		Node  *Node
+		Slots []int32
+	}
+	// we'll keep the slots of the nodes to be drained in an array of node-[]int32 
+	stealMap := make([]NodeStealMap, len(masters)-int(cluster.Spec.Masters))
 	nodes := c.GetMasters()
 	totalNumberOfSlots := 0
+	index := 0
 	// we have to find the nodes which are the ones to be removed, from bottom of the statefulset
 	for _, node := range nodes {
 		ordinal := node.GetOrdinal()
 		if ordinal >= cluster.Spec.Masters {
 			// we'll have to remove this node, therefore we should add its slots to steal list
 			slots := node.NodeAttributes.GetSlots()
-			stealMap[node] = slots
+			stealMap[index] = NodeStealMap{
+				Node:  node,
+				Slots: slots,
+			}
+			// we should also count the total number of slots to be moved
+			// this is needed to calculate the fair share of slots to be moved
+			// to the nodes which are to be kept
 			totalNumberOfSlots += len(slots)
+			index++
 		}
 	}
 	// Now we have a list of the slots to be moved from the masters which are to be removed to the masters which are to be kept
 	// We should calculate a move map that will provide a fair share
 	slotsPerMaster := int(math.Ceil(float64(totalNumberOfSlots) / float64(cluster.Spec.Masters)))
-	lastIndex := 0
+	nodeToStealFrom := 0
+	lastStealSlotIndex := 0
+	slotsAlreadyFilled := 0
+	fillNodeIndex := 0
 	
-	for i:=0; i < int(cluster.Spec.Masters); i++ {
-		startIndex := slotsPerMaster * i
-		endIndex := startIndex + slotsPerMaster
-		if endIndex > totalNumberOfSlots {
-			endIndex = totalNumberOfSlots
+	for fillNodeIndex < int(cluster.Spec.Masters) && nodeToStealFrom < len(stealMap) {
+		slotsStillAvailableOnCurrentNode := len(stealMap[nodeToStealFrom].Slots) - lastStealSlotIndex
+
+		if slotsStillAvailableOnCurrentNode >= slotsPerMaster - slotsAlreadyFilled {
+			// We can take all the slots we need from this node
+			result = append(result, slotMoveMap{
+				Source:      stealMap[nodeToStealFrom].Node,
+				Destination: nodes[fillNodeIndex],
+				Slots:       stealMap[nodeToStealFrom].Slots[lastStealSlotIndex : lastStealSlotIndex+slotsPerMaster-slotsAlreadyFilled],
+			})
+			lastStealSlotIndex += slotsPerMaster - slotsAlreadyFilled
+			slotsAlreadyFilled = 0 // settting to 0 for the next node, as this one should be full by now
+			fillNodeIndex++ // we can move to the next node
+		} else {
+			// We can only take some of the slots from this node
+			result = append(result, slotMoveMap{
+				Source:      stealMap[nodeToStealFrom].Node,
+				Destination: nodes[fillNodeIndex],
+				Slots:       stealMap[nodeToStealFrom].Slots[lastStealSlotIndex:],
+			})
+			slotsAlreadyFilled += slotsStillAvailableOnCurrentNode
+			lastStealSlotIndex = 0 // move on to the next node in the steal map
+			nodeToStealFrom++ // we can move to the next node in the steal map
 		}
-		for j := startIndex; j < endIndex; j++ {
-			if j >= len(masters) {
-				break
-			}
-			node := masters[j]
-			if len(stealMap) == 0 {
-				break
-			}
-			// We need to find a node which has slots to steal from
-			for stealNode, stealSlots := range stealMap {
-				if len(stealSlots) == 0 {
-					continue
-				}
-				slotsToSteal := stealSlots[:1] // we take one slot at a time
-				stealMap[stealNode] = stealSlots[1:]
-				result = append(result, slotMoveMap{
-					Source:      stealNode,
-					Destination: node,
-					Slots:       slotsToSteal,
-				})
-				lastIndex = j
-				break
-			}
-		}
-		lastIndex++
 	}
 	return result
 }
