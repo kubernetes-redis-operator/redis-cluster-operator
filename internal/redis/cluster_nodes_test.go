@@ -962,42 +962,42 @@ func TestClusterNodes_CalculateRemoveNodes5to3(t *testing.T) {
 }
 
 func TestClusterNodes_CalculateRemoveNodes7to5(t *testing.T) {
-    var nodes []*Node
-    mocks := map[string]*redismock.ClientMock{}
-    nodeIDs := []string{
-        "node0", "node1", "node2", "node3", "node4", "node5", "node6",
-    }
-    slotRanges := []string{
-        "0-2340", "2341-4681", "4682-7022", "7023-9363", "9364-11704", "11705-14045", "14046-16383",
-    }
-    for i := 0; i < 7; i++ {
-        node, err := NewNode(context.TODO(), &redis.Options{
-            Addr: fmt.Sprintf("10.20.30.6%d:6379", i),
-        }, &v1.Pod{
-            ObjectMeta: metav1.ObjectMeta{
-                Name:      fmt.Sprintf("rediscluster-%d", i),
-                Namespace: "default",
-            },
-        }, func(opt *redis.Options) *redis.Client {
-            client, mock := redismock.NewClientMock()
-            mock.ExpectClusterNodes().SetVal(fmt.Sprintf(
-                "%s 10.20.30.6%d:6379@16379 myself,master - 0 0 %d connected %s\n",
-                nodeIDs[i], i, i, slotRanges[i],
-            ))
-            mocks[nodeIDs[i]] = &mock
-            return client
-        })
-        if err != nil {
-            t.Fatalf("Error creating node: %v", err)
-        }
-        node.NodeAttributes.ID = nodeIDs[i]
-        nodes = append(nodes, node)
-    }
-    clusterNodes := ClusterNodes{Nodes: nodes}
-    slotMoves := clusterNodes.CalculateRemoveNodes(context.TODO(), &v1alpha1.RedisCluster{
-        ObjectMeta: metav1.ObjectMeta{Name: "redis-cluster", Namespace: "default"},
-        Spec:       v1alpha1.RedisClusterSpec{Masters: 5},
-    })
+	var nodes []*Node
+	mocks := map[string]*redismock.ClientMock{}
+	nodeIDs := []string{
+		"node0", "node1", "node2", "node3", "node4", "node5", "node6",
+	}
+	slotRanges := []string{
+		"0-2340", "2341-4681", "4682-7022", "7023-9363", "9364-11704", "11705-14045", "14046-16383",
+	}
+	for i := 0; i < 7; i++ {
+		node, err := NewNode(context.TODO(), &redis.Options{
+			Addr: fmt.Sprintf("10.20.30.6%d:6379", i),
+		}, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("rediscluster-%d", i),
+				Namespace: "default",
+			},
+		}, func(opt *redis.Options) *redis.Client {
+			client, mock := redismock.NewClientMock()
+			mock.ExpectClusterNodes().SetVal(fmt.Sprintf(
+				"%s 10.20.30.6%d:6379@16379 myself,master - 0 0 %d connected %s\n",
+				nodeIDs[i], i, i, slotRanges[i],
+			))
+			mocks[nodeIDs[i]] = &mock
+			return client
+		})
+		if err != nil {
+			t.Fatalf("Error creating node: %v", err)
+		}
+		node.NodeAttributes.ID = nodeIDs[i]
+		nodes = append(nodes, node)
+	}
+	clusterNodes := ClusterNodes{Nodes: nodes}
+	slotMoves := clusterNodes.CalculateRemoveNodes(context.TODO(), &v1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "redis-cluster", Namespace: "default"},
+		Spec:       v1alpha1.RedisClusterSpec{Masters: 5},
+	})
 
 	assert.Len(t, slotMoves, 6, "Expected six slot moves when removing nodes from a 7 node cluster to a 5 node cluster")
 	assert.Equal(t, "node5", slotMoves[0].Source.NodeAttributes.ID, "Expected first slot move to be from node5")
@@ -1021,42 +1021,42 @@ func TestClusterNodes_CalculateRemoveNodes7to5(t *testing.T) {
 }
 
 func TestClusterNodes_CalculateRemoveNodes7to3(t *testing.T) {
-    var nodes []*Node
-    mocks := map[string]*redismock.ClientMock{}
-    nodeIDs := []string{
-        "node0", "node1", "node2", "node3", "node4", "node5", "node6",
-    }
-    slotRanges := []string{
-        "0-2340", "2341-4681", "4682-7022", "7023-9363", "9364-11704", "11705-14045", "14046-16383",
-    }
-    for i := 0; i < 7; i++ {
-        node, err := NewNode(context.TODO(), &redis.Options{
-            Addr: fmt.Sprintf("10.20.30.7%d:6379", i),
-        }, &v1.Pod{
-            ObjectMeta: metav1.ObjectMeta{
-                Name:      fmt.Sprintf("rediscluster-%d", i),
-                Namespace: "default",
-            },
-        }, func(opt *redis.Options) *redis.Client {
-            client, mock := redismock.NewClientMock()
-            mock.ExpectClusterNodes().SetVal(fmt.Sprintf(
-                "%s 10.20.30.7%d:6379@16379 myself,master - 0 0 %d connected %s\n",
-                nodeIDs[i], i, i, slotRanges[i],
-            ))
-            mocks[nodeIDs[i]] = &mock
-            return client
-        })
-        if err != nil {
-            t.Fatalf("Error creating node: %v", err)
-        }
-        node.NodeAttributes.ID = nodeIDs[i]
-        nodes = append(nodes, node)
-    }
-    clusterNodes := ClusterNodes{Nodes: nodes}
-    slotMoves := clusterNodes.CalculateRemoveNodes(context.TODO(), &v1alpha1.RedisCluster{
-        ObjectMeta: metav1.ObjectMeta{Name: "redis-cluster", Namespace: "default"},
-        Spec:       v1alpha1.RedisClusterSpec{Masters: 3},
-    })
+	var nodes []*Node
+	mocks := map[string]*redismock.ClientMock{}
+	nodeIDs := []string{
+		"node0", "node1", "node2", "node3", "node4", "node5", "node6",
+	}
+	slotRanges := []string{
+		"0-2340", "2341-4681", "4682-7022", "7023-9363", "9364-11704", "11705-14045", "14046-16383",
+	}
+	for i := 0; i < 7; i++ {
+		node, err := NewNode(context.TODO(), &redis.Options{
+			Addr: fmt.Sprintf("10.20.30.7%d:6379", i),
+		}, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("rediscluster-%d", i),
+				Namespace: "default",
+			},
+		}, func(opt *redis.Options) *redis.Client {
+			client, mock := redismock.NewClientMock()
+			mock.ExpectClusterNodes().SetVal(fmt.Sprintf(
+				"%s 10.20.30.7%d:6379@16379 myself,master - 0 0 %d connected %s\n",
+				nodeIDs[i], i, i, slotRanges[i],
+			))
+			mocks[nodeIDs[i]] = &mock
+			return client
+		})
+		if err != nil {
+			t.Fatalf("Error creating node: %v", err)
+		}
+		node.NodeAttributes.ID = nodeIDs[i]
+		nodes = append(nodes, node)
+	}
+	clusterNodes := ClusterNodes{Nodes: nodes}
+	slotMoves := clusterNodes.CalculateRemoveNodes(context.TODO(), &v1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "redis-cluster", Namespace: "default"},
+		Spec:       v1alpha1.RedisClusterSpec{Masters: 3},
+	})
 
 	assert.Len(t, slotMoves, 6, "Expected six slot moves when removing nodes from a 7 node cluster to a 3 node cluster")
 	assert.Equal(t, "node3", slotMoves[0].Source.NodeAttributes.ID, "Expected first slot move to be from node3")

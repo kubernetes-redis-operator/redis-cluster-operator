@@ -101,7 +101,7 @@ func (c *ClusterNodes) GetMissingSlots() []int32 {
 	for _, slot := range c.GetAssignedSlots() {
 		delete(slotMap, slot)
 	}
-	for slot, _ := range slotMap {
+	for slot := range slotMap {
 		result = append(result, slot)
 	}
 	sort.Slice(result, func(i, j int) bool {
@@ -356,7 +356,7 @@ func (c *ClusterNodes) CalculateRemoveNodes(ctx context.Context, cluster *v1alph
 		Node  *Node
 		Slots []int32
 	}
-	// we'll keep the slots of the nodes to be drained in an array of node-[]int32 
+	// we'll keep the slots of the nodes to be drained in an array of node-[]int32
 	stealMap := make([]NodeStealMap, len(masters)-int(cluster.Spec.Masters))
 	nodes := c.GetMasters()
 	totalNumberOfSlots := 0
@@ -385,11 +385,11 @@ func (c *ClusterNodes) CalculateRemoveNodes(ctx context.Context, cluster *v1alph
 	lastStealSlotIndex := 0
 	slotsAlreadyFilled := 0
 	fillNodeIndex := 0
-	
+
 	for fillNodeIndex < int(cluster.Spec.Masters) && nodeToStealFrom < len(stealMap) {
 		slotsStillAvailableOnCurrentNode := len(stealMap[nodeToStealFrom].Slots) - lastStealSlotIndex
 
-		if slotsStillAvailableOnCurrentNode >= slotsPerMaster - slotsAlreadyFilled {
+		if slotsStillAvailableOnCurrentNode >= slotsPerMaster-slotsAlreadyFilled {
 			// We can take all the slots we need from this node
 			result = append(result, slotMoveMap{
 				Source:      stealMap[nodeToStealFrom].Node,
@@ -398,7 +398,7 @@ func (c *ClusterNodes) CalculateRemoveNodes(ctx context.Context, cluster *v1alph
 			})
 			lastStealSlotIndex += slotsPerMaster - slotsAlreadyFilled
 			slotsAlreadyFilled = 0 // settting to 0 for the next node, as this one should be full by now
-			fillNodeIndex++ // we can move to the next node
+			fillNodeIndex++        // we can move to the next node
 		} else {
 			// We can only take some of the slots from this node
 			result = append(result, slotMoveMap{
@@ -408,7 +408,7 @@ func (c *ClusterNodes) CalculateRemoveNodes(ctx context.Context, cluster *v1alph
 			})
 			slotsAlreadyFilled += slotsStillAvailableOnCurrentNode
 			lastStealSlotIndex = 0 // move on to the next node in the steal map
-			nodeToStealFrom++ // we can move to the next node in the steal map
+			nodeToStealFrom++      // we can move to the next node in the steal map
 		}
 	}
 	return result
