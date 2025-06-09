@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -45,14 +46,64 @@ type RedisClusterSpec struct {
 	PodSpec v1.PodSpec `json:"podSpec,omitempty"`
 }
 
+// ClusterStateType is a string type for cluster state enum-like values
+type ClusterStateType string
+
+const (
+	// ClusterStateNormal indicates that the cluster is in a normal operational state.
+	ClusterStateNormal            ClusterStateType = "Normal"
+	// ClusterStateScalingOut indicates that the cluster is currently scaling out (adding nodes).
+	ClusterStateScalingOut        ClusterStateType = "ScalingOut"
+	// ClusterStateScalingIn indicates that the cluster is currently scaling in (removing nodes).
+	ClusterStateScalingIn         ClusterStateType = "ScalingIn"
+	// ClusterStateIncreasingReplicas indicates that the cluster is currently increasing the number of replicas.
+	ClusterStateIncreasingReplicas ClusterStateType = "IncreasingReplicas"
+	// ClusterStateDecreasingReplicas indicates that the cluster is currently decreasing the number of replicas.
+	ClusterStateDecreasingReplicas ClusterStateType = "DecreasingReplicas"
+	// ClusterStateUpgradingVersion indicates that the cluster is currently upgrading its version.
+	ClusterStateUpgradingVersion  ClusterStateType = "UpgradingVersion"
+)
+
 // RedisClusterStatus defines the observed state of RedisCluster
 type RedisClusterStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// ClusterState represents the current state of the cluster.
+	// Allowed values: Normal, ScalingOut, ScalingIn, IncreasingReplicas, DecreasingReplicas, UpgradingVersion
+	ClusterState ClusterStateType `json:"clusterState,omitempty"`
+
+	// Conditions represent the latest available observations of an object's state
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// SetInOperationCondition sets or updates the InOperation condition in the status.
+func (rcs *RedisClusterStatus) SetInOperationCondition(inOperation bool, reason, message string) {
+	condition := metav1.Condition{
+		Type:    "InOperation",
+		Status:  metav1.ConditionFalse,
+		Reason:  reason,
+		Message: message,
+	}
+	if inOperation {
+		condition.Status = metav1.ConditionTrue
+	}
+	meta.SetStatusCondition(&rcs.Conditions, condition)
+}
+
+// GetInOperationCondition returns the InOperation condition if present.
+func (rcs *RedisClusterStatus) GetInOperationCondition() *metav1.Condition {
+	for i := range rcs.Conditions {
+		if rcs.Conditions[i].Type == "InOperation" {
+			return &rcs.Conditions[i]
+		}
+	}
+	return nil
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Masters",type="integer",JSONPath=".spec.masters"
+// +kubebuilder:printcolumn:name="ReplicasPerMaster",type="integer",JSONPath=".spec.replicasPerMaster"
+// +kubebuilder:printcolumn:name="ClusterState",type="string",JSONPath=".status.clusterState"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // RedisCluster is the Schema for the redisclusters API
 type RedisCluster struct {
