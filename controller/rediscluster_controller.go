@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/go-redis/redis/v8"
 	redis_internal "github.com/kubernetes-redis-operator/redis-cluster-operator/internal/redis"
 	"github.com/kubernetes-redis-operator/redis-cluster-operator/internal/utils"
@@ -74,207 +75,23 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//endregion
 
 	//region Try to get the ConfigMap for the RedisCluster
-	configMap, err := r.KubernetesManager.FetchConfigmap(ctx, redisCluster)
-	if err != nil && !apierrors.IsNotFound(err) {
-		// This is a legitimate error, we should log the error and exit early, requeuing the reconciliation
-		logger.Error(err, "error checking the existence of ConfigMap")
-		return ctrl.Result{
-			RequeueAfter: 30 * time.Second,
-		}, err
-	}
-	if apierrors.IsNotFound(err) {
-		// We successfully checked but the ConfigMap does not exist. We need to create it.
-		configMap, err = r.KubernetesManager.CreateConfigMap(ctx, redisCluster)
-		if err != nil {
-			// Error creating the Configmap, we should log the error and exit early, requeuing the reconciliation
-			logger.Error(err, "error creating ConfigMap for RedisCluster")
-			return ctrl.Result{
-				RequeueAfter: 30 * time.Second,
-			}, err
-		}
-
-		// We've created the ConfigMap, we'll requeue the reconciliation in 5 seconds to give the ConfigMap time to be created
-		logger.Info("Created ConfigMap for RedisCluster. Reconciling in 5 seconds.")
-		return ctrl.Result{
-			RequeueAfter: 5 * time.Second,
-		}, err
-	}
-	//endregion
-
-	//region Try to set ConfigMap owner reference
-	err = retry.RetryOnConflict(wait.Backoff{
-		Steps:    5,
-		Duration: 2 * time.Second,
-		Factor:   1.0,
-		Jitter:   0.1,
-	}, func() error {
-		configMap, err = r.KubernetesManager.FetchConfigmap(ctx, redisCluster)
-		if err != nil {
-			// At this point we definitely expect the statefulset to exist.
-			logger.Error(err, "error finding configMap")
-			return err
-		}
-		err = ctrl.SetControllerReference(redisCluster, configMap, r.Scheme)
-		if err != nil {
-			logger.Error(err, "error setting owner reference of ConfigMap")
-			return err
-		}
-		err = r.KubernetesManager.UpdateResource(ctx, configMap)
-		if err != nil {
-			logger.Error(err, "error updating owner reference of ConfigMap")
-		}
-		return err
-	})
-	if err != nil {
-		logger.Error(err, "error setting/updating owner reference of ConfigMap")
-		return ctrl.Result{
-			RequeueAfter: 10 * time.Second,
-		}, err
+	result, err := r.ensureConfigMap(ctx, logger, redisCluster)
+	if err != nil || result.RequeueAfter > 0 {
+		return result, err
 	}
 	//endregion
 
 	//region Ensure Statefulset
-	masterSSet, replSSets, err := r.KubernetesManager.FetchStatefulsets(ctx, redisCluster)
-	if err != nil && !apierrors.IsNotFound(err) {
-		// We've got a legitimate error, we should log the error and exit early
-		logger.Error(err, "Could not check whether statefulset exists due to error.")
-		return ctrl.Result{
-			RequeueAfter: 30 * time.Second,
-		}, err
-	}
-
-	if apierrors.IsNotFound(err) {
-		// We need to create the Statefulset
-		masterSSet, replSSets, err = r.KubernetesManager.CreateStatefulsets(ctx, redisCluster)
-		if err != nil {
-			logger.Error(err, "Failed to create Statefulset for RedisCluster")
-			return ctrl.Result{
-				RequeueAfter: 30 * time.Second,
-			}, err
-		}
-
-		// We've created the Statefulset, and we can wait a bit before trying to do the rest.
-		// We can trigger a new reconcile for this object in about 5 seconds
-		logger.Info("Created Statefulset for RedisCluster. Reconciling in 5 seconds.")
-		return ctrl.Result{
-			RequeueAfter: 5 * time.Second,
-		}, err
-	}
-	//endregion
-
-	//region Set Statefsulset owner reference
-	masterSSet, replSSets, err = r.KubernetesManager.FetchStatefulsets(ctx, redisCluster)
-	if err != nil {
-		// At this point we definitely expect the statefulset to exist.
-		logger.Error(err, "Cannot find statefulsets")
-		return ctrl.Result{
-			RequeueAfter: 5 * time.Second,
-		}, err
-	}
-	err = retry.RetryOnConflict(wait.Backoff{
-		Steps:    5,
-		Duration: 2 * time.Second,
-		Factor:   1.0,
-		Jitter:   0.1,
-	}, func() error {
-		err = ctrl.SetControllerReference(redisCluster, masterSSet, r.Scheme) // ToDo: This is a hack. We should update all statefulsets
-		if err != nil {
-			logger.Error(err, fmt.Sprintf("Could not set owner name for master statefulset named %s", masterSSet.Name))
-			return err
-		}
-		err = r.KubernetesManager.UpdateResource(ctx, masterSSet) // ToDo: This is a hack. We should update all statefulsets
-		if err != nil {
-			logger.Error(err, fmt.Sprintf("Could not update master statefulset named %s  with owner reference", masterSSet.Name))
-			return err
-		}
-		return err
-	})
-	for _, statefulset := range replSSets {
-		err = retry.RetryOnConflict(wait.Backoff{
-			Steps:    5,
-			Duration: 2 * time.Second,
-			Factor:   1.0,
-			Jitter:   0.1,
-		}, func() error {
-			err = ctrl.SetControllerReference(redisCluster, statefulset, r.Scheme) // ToDo: This is a hack. We should update all statefulsets
-			if err != nil {
-				logger.Error(err, fmt.Sprintf("Could not set owner name for replica statefulset named %s", statefulset.Name))
-				return err
-			}
-			err = r.KubernetesManager.UpdateResource(ctx, statefulset) // ToDo: This is a hack. We should update all statefulsets
-			if err != nil {
-				logger.Error(err, fmt.Sprintf("Could not update replica statefulset named %s  with owner reference", statefulset.Name))
-				return err
-			}
-			return err
-
-		})
-	}
-	if err != nil {
-		logger.Error(err, "Could not set owner reference for statefulset")
-		return ctrl.Result{
-			RequeueAfter: 10 * time.Second,
-		}, err
+	masterSSet, replSSets, result, err := r.ensureStatefulSet(ctx, logger, redisCluster)
+	if err != nil || result.RequeueAfter > 0 {
+		return result, err
 	}
 	//endregion
 
 	//region Ensure Service
-	service, err := r.KubernetesManager.FetchService(ctx, redisCluster)
-	if err != nil && !apierrors.IsNotFound(err) {
-		// We've got a legitimate error, we should log the error and exit early
-		logger.Error(err, "Could not check whether service exists due to error.")
-		return ctrl.Result{
-			RequeueAfter: 30 * time.Second,
-		}, err
-	}
-	if apierrors.IsNotFound(err) {
-		// We need to create the Statefulset
-		service, err = r.KubernetesManager.CreateService(ctx, redisCluster)
-		if err != nil {
-			logger.Error(err, "Failed to create Service for RedisCluster")
-			return ctrl.Result{
-				RequeueAfter: 30 * time.Second,
-			}, err
-		}
-
-		// We've created the Statefulset, and we can wait a bit before trying to do the rest.
-		// We can trigger a new reconcile for this object in about 5 seconds
-		logger.Info("Created Service for RedisCluster. Reconciling in 5 seconds.")
-		return ctrl.Result{
-			RequeueAfter: 5 * time.Second,
-		}, err
-	}
-	// endregion
-
-	//region Set Service owner reference
-	err = retry.RetryOnConflict(wait.Backoff{
-		Steps:    5,
-		Duration: 2 * time.Second,
-		Factor:   1.0,
-		Jitter:   0.1,
-	}, func() error {
-		service, err = r.KubernetesManager.FetchService(ctx, redisCluster)
-		if err != nil {
-			// At this point we definitely expect the statefulset to exist.
-			logger.Error(err, "Cannot find service")
-			return err
-		}
-		err = ctrl.SetControllerReference(redisCluster, service, r.Scheme)
-		if err != nil {
-			logger.Error(err, "Could not set owner reference for service")
-			return err
-		}
-		err = r.KubernetesManager.UpdateResource(ctx, service)
-		if err != nil {
-			logger.Error(err, "Could not update service with owner reference")
-		}
-		return err
-	})
-	if err != nil {
-		logger.Error(err, "Could not set owner reference for service")
-		return ctrl.Result{
-			RequeueAfter: 10 * time.Second,
-		}, err
+	result, err = r.ensureService(ctx, logger, redisCluster)
+	if err != nil || result.RequeueAfter > 0 {
+		return result, err
 	}
 	//endregion
 
@@ -475,4 +292,189 @@ type clusterInfo struct {
 
 func decorateRedisCluster(rdcl *redisclusterv1alpha1.RedisCluster) {
 
+}
+
+func (r *RedisClusterReconciler) ensureConfigMap(ctx context.Context, logger logr.Logger, redisCluster *redisclusterv1alpha1.RedisCluster) (ctrl.Result, error) {
+	configMap, err := r.KubernetesManager.FetchConfigmap(ctx, redisCluster)
+	if err != nil && !apierrors.IsNotFound(err) {
+		logger.Error(err, "error checking the existence of ConfigMap")
+		return ctrl.Result{
+			RequeueAfter: 30 * time.Second,
+		}, err
+	}
+	if apierrors.IsNotFound(err) {
+		configMap, err = r.KubernetesManager.CreateConfigMap(ctx, redisCluster)
+		if err != nil {
+			logger.Error(err, "error creating ConfigMap for RedisCluster")
+			return ctrl.Result{
+				RequeueAfter: 30 * time.Second,
+			}, err
+		}
+		logger.Info("Created ConfigMap for RedisCluster. Reconciling in 5 seconds.")
+		return ctrl.Result{
+			RequeueAfter: 5 * time.Second,
+		}, err
+	}
+
+	err = retry.RetryOnConflict(wait.Backoff{
+		Steps:    5,
+		Duration: 2 * time.Second,
+		Factor:   1.0,
+		Jitter:   0.1,
+	}, func() error {
+		configMap, err = r.KubernetesManager.FetchConfigmap(ctx, redisCluster)
+		if err != nil {
+			logger.Error(err, "error finding configMap")
+			return err
+		}
+		err = ctrl.SetControllerReference(redisCluster, configMap, r.Scheme)
+		if err != nil {
+			logger.Error(err, "error setting owner reference of ConfigMap")
+			return err
+		}
+		err = r.KubernetesManager.UpdateResource(ctx, configMap)
+		if err != nil {
+			logger.Error(err, "error updating owner reference of ConfigMap")
+		}
+		return err
+	})
+	if err != nil {
+		logger.Error(err, "error setting/updating owner reference of ConfigMap")
+		return ctrl.Result{
+			RequeueAfter: 10 * time.Second,
+		}, err
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *RedisClusterReconciler) ensureStatefulSet(ctx context.Context, logger logr.Logger, redisCluster *redisclusterv1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, ctrl.Result, error) {
+    masterSSet, replSSets, err := r.KubernetesManager.FetchStatefulsets(ctx, redisCluster)
+    if err != nil && !apierrors.IsNotFound(err) {
+        logger.Error(err, "Could not check whether statefulset exists due to error.")
+        return nil, nil, ctrl.Result{
+            RequeueAfter: 30 * time.Second,
+        }, err
+    }
+
+    if apierrors.IsNotFound(err) {
+        masterSSet, replSSets, err = r.KubernetesManager.CreateStatefulsets(ctx, redisCluster)
+        if err != nil {
+            logger.Error(err, "Failed to create Statefulset for RedisCluster")
+            return nil, nil, ctrl.Result{
+                RequeueAfter: 30 * time.Second,
+            }, err
+        }
+        logger.Info("Created Statefulset for RedisCluster. Reconciling in 5 seconds.")
+        return masterSSet, replSSets, ctrl.Result{
+            RequeueAfter: 5 * time.Second,
+        }, err
+    }
+
+    // Set owner reference for master statefulset
+    masterSSet, replSSets, err = r.KubernetesManager.FetchStatefulsets(ctx, redisCluster)
+    if err != nil {
+        logger.Error(err, "Cannot find statefulsets")
+        return nil, nil, ctrl.Result{
+            RequeueAfter: 5 * time.Second,
+        }, err
+    }
+    err = retry.RetryOnConflict(wait.Backoff{
+        Steps:    5,
+        Duration: 2 * time.Second,
+        Factor:   1.0,
+        Jitter:   0.1,
+    }, func() error {
+        err = ctrl.SetControllerReference(redisCluster, masterSSet, r.Scheme)
+        if err != nil {
+            logger.Error(err, fmt.Sprintf("Could not set owner name for master statefulset named %s", masterSSet.Name))
+            return err
+        }
+        err = r.KubernetesManager.UpdateResource(ctx, masterSSet)
+        if err != nil {
+            logger.Error(err, fmt.Sprintf("Could not update master statefulset named %s  with owner reference", masterSSet.Name))
+			return err
+        }
+        return err
+    })
+    for _, statefulset := range replSSets {
+        err = retry.RetryOnConflict(wait.Backoff{
+            Steps:    5,
+            Duration: 2 * time.Second,
+            Factor:   1.0,
+            Jitter:   0.1,
+        }, func() error {
+            err = ctrl.SetControllerReference(redisCluster, statefulset, r.Scheme)
+            if err != nil {
+                logger.Error(err, fmt.Sprintf("Could not set owner name for replica statefulset named %s", statefulset.Name))
+                return err
+            }
+            err = r.KubernetesManager.UpdateResource(ctx, statefulset)
+            if err != nil {
+                logger.Error(err, fmt.Sprintf("Could not update replica statefulset named %s  with owner reference", statefulset.Name))
+                return err
+            }
+            return err
+        })
+    }
+    if err != nil {
+        logger.Error(err, "Could not set owner reference for statefulset")
+        return nil, nil, ctrl.Result{
+            RequeueAfter: 10 * time.Second,
+        }, err
+    }
+    return masterSSet, replSSets, ctrl.Result{}, nil
+}
+
+func (r *RedisClusterReconciler) ensureService(ctx context.Context, logger logr.Logger, redisCluster *redisclusterv1alpha1.RedisCluster) (ctrl.Result, error) {
+    service, err := r.KubernetesManager.FetchService(ctx, redisCluster)
+    if err != nil && !apierrors.IsNotFound(err) {
+        logger.Error(err, "Could not check whether service exists due to error.")
+        return ctrl.Result{
+            RequeueAfter: 30 * time.Second,
+        }, err
+    }
+    if apierrors.IsNotFound(err) {
+        service, err = r.KubernetesManager.CreateService(ctx, redisCluster)
+        if err != nil {
+            logger.Error(err, "Failed to create Service for RedisCluster")
+            return ctrl.Result{
+                RequeueAfter: 30 * time.Second,
+            }, err
+        }
+        logger.Info("Created Service for RedisCluster. Reconciling in 5 seconds.")
+        return ctrl.Result{
+            RequeueAfter: 5 * time.Second,
+        }, err
+    }
+
+    // Set Service owner reference
+    err = retry.RetryOnConflict(wait.Backoff{
+        Steps:    5,
+        Duration: 2 * time.Second,
+        Factor:   1.0,
+        Jitter:   0.1,
+    }, func() error {
+        service, err = r.KubernetesManager.FetchService(ctx, redisCluster)
+        if err != nil {
+            logger.Error(err, "Cannot find service")
+            return err
+        }
+        err = ctrl.SetControllerReference(redisCluster, service, r.Scheme)
+        if err != nil {
+            logger.Error(err, "Could not set owner reference for service")
+            return err
+        }
+        err = r.KubernetesManager.UpdateResource(ctx, service)
+        if err != nil {
+            logger.Error(err, "Could not update service with owner reference")
+        }
+        return err
+    })
+    if err != nil {
+        logger.Error(err, "Could not set owner reference for service")
+        return ctrl.Result{
+            RequeueAfter: 10 * time.Second,
+        }, err
+    }
+    return ctrl.Result{}, nil
 }
