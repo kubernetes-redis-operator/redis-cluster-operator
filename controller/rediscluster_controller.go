@@ -290,10 +290,6 @@ type clusterInfo struct {
 	scr          *corev1.Secret
 }
 
-func decorateRedisCluster(rdcl *redisclusterv1alpha1.RedisCluster) {
-
-}
-
 func (r *RedisClusterReconciler) ensureConfigMap(ctx context.Context, logger logr.Logger, redisCluster *redisclusterv1alpha1.RedisCluster) (ctrl.Result, error) {
 	configMap, err := r.KubernetesManager.FetchConfigmap(ctx, redisCluster)
 	if err != nil && !apierrors.IsNotFound(err) {

@@ -18,15 +18,18 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
 	cachev1alpha1 "github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
 	"github.com/kubernetes-redis-operator/redis-cluster-operator/internal/kubernetes"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -317,7 +320,7 @@ func TestRedisClusterReconciler_Reconcile_CreatesConfigMapForRedisCluster(t *tes
 		Namespace: "default",
 	}, configMap)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			t.Fatalf("ConfigMap was not created during reconcile %v", err)
 		}
 		t.Fatalf("Failed to fetch created ConfigMap %v", err)
@@ -386,7 +389,7 @@ func TestRedisClusterReconciler_Reconcile_DoesNotFailIfConfigMapExists(t *testin
 		Namespace: "default",
 	}, configMap)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			t.Fatalf("ConfigMap was not created during reconcile %v", err)
 		}
 		t.Fatalf("Failed to fetch created ConfigMap %v", err)
@@ -459,4 +462,462 @@ func TestRedisClusterReconciler_Reconcile_ConfigMapHasOwnerReferenceSetToRedisCl
 	if configmap.GetOwnerReferences()[0].Name != redisCluster.Name || configmap.GetOwnerReferences()[0].Kind != gvk.Kind {
 		t.Fatalf("Owner not correctly set")
 	}
+}
+func TestRedisClusterReconciler_ensureConfigMap_CreatesConfigMapIfNotFound(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+		Spec: cachev1alpha1.RedisClusterSpec{
+			Masters:           3,
+			ReplicasPerMaster: 1,
+		},
+	}
+
+	calledCreate := false
+	mockKM := &mockKubernetesManager{
+		FetchConfigmapFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.ConfigMap, error) {
+			return nil, apierrors.NewNotFound(corev1.Resource("configmap"), "redis-cluster-config")
+		},
+		CreateConfigMapFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.ConfigMap, error) {
+			calledCreate = true
+			return &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      rc.Name + "-config",
+					Namespace: rc.Namespace,
+				},
+			}, nil
+		},
+	}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mockKM,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	result, err := r.ensureConfigMap(context.TODO(), logger, redisCluster)
+	assert.NoError(t, err)
+	assert.True(t, calledCreate)
+	assert.Equal(t, 5*time.Second, result.RequeueAfter)
+}
+
+func TestRedisClusterReconciler_ensureConfigMap_ReturnsErrorOnFetchError(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+	}
+
+	mockKM := &mockKubernetesManager{
+		FetchConfigmapFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.ConfigMap, error) {
+			return nil, fmt.Errorf("unexpected error")
+		},
+	}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mockKM,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	result, err := r.ensureConfigMap(context.TODO(), logger, redisCluster)
+	assert.Error(t, err)
+	assert.Equal(t, 30*time.Second, result.RequeueAfter)
+}
+
+func TestRedisClusterReconciler_ensureConfigMap_ReturnsErrorOnCreateError(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+	}
+
+	mockKM := &mockKubernetesManager{
+		FetchConfigmapFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.ConfigMap, error) {
+			return nil, apierrors.NewNotFound(corev1.Resource("configmap"), "redis-cluster-config")
+		},
+		CreateConfigMapFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.ConfigMap, error) {
+			return nil, fmt.Errorf("create error")
+		},
+	}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mockKM,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	result, err := r.ensureConfigMap(context.TODO(), logger, redisCluster)
+	assert.Error(t, err)
+	assert.Equal(t, 30*time.Second, result.RequeueAfter)
+}
+
+func TestRedisClusterReconciler_ensureConfigMap_SetsOwnerReferenceIfConfigMapExists(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+			UID:       "12345",
+		},
+	}
+
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster-config",
+			Namespace: "default",
+		},
+	}
+
+	updateCalled := false
+	mockKM := &mockKubernetesManager{
+		FetchConfigmapFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.ConfigMap, error) {
+			return configMap, nil
+		},
+		UpdateResourceFunc: func(ctx context.Context, obj client.Object) error {
+			updateCalled = true
+			return nil
+		},
+	}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mockKM,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	result, err := r.ensureConfigMap(context.TODO(), logger, redisCluster)
+	assert.NoError(t, err)
+	assert.True(t, updateCalled)
+	assert.Equal(t, time.Duration(0), result.RequeueAfter)
+}
+func TestRedisClusterReconciler_ensureStatefulSet_CreatesStatefulSetIfNotFound(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+		Spec: cachev1alpha1.RedisClusterSpec{
+			Masters:           3,
+			ReplicasPerMaster: 1,
+		},
+	}
+
+	masterSS := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster-master",
+			Namespace: "default",
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: func() *int32 { i := int32(3); return &i }(),
+		},
+	}
+	replicaSS := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster-replica",
+			Namespace: "default",
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: func() *int32 { i := int32(3); return &i }(),
+		},
+	}
+
+	mkm := &mockKubernetesManager{}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mkm,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	mkm.FetchStatefulsetsFunc = func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
+		return nil, nil, apierrors.NewNotFound(appsv1.Resource("statefulset"), "redis-cluster-master")
+	}
+	mkm.CreateStatefulsetsFunc = func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
+		return masterSS, []*appsv1.StatefulSet{replicaSS}, nil
+	}
+	gotMaster, gotReplicas, result, err := r.ensureStatefulSet(context.TODO(), logger, redisCluster)
+	assert.NoError(t, err)
+	assert.Equal(t, masterSS, gotMaster)
+	assert.Equal(t, []*appsv1.StatefulSet{replicaSS}, gotReplicas)
+	assert.Equal(t, 5*time.Second, result.RequeueAfter)
+}
+
+func TestRedisClusterReconciler_ensureStatefulSet_ReturnsErrorOnFetchError(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+	}
+
+	mockKM := &mockKubernetesManager{
+		FetchStatefulsetsFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
+			return nil, nil, fmt.Errorf("unexpected error")
+		},
+	}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mockKM,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	gotMaster, gotReplicas, result, err := r.ensureStatefulSet(context.TODO(), logger, redisCluster)
+	assert.Error(t, err)
+	assert.Nil(t, gotMaster)
+	assert.Nil(t, gotReplicas)
+	assert.Equal(t, 30*time.Second, result.RequeueAfter)
+}
+
+func TestRedisClusterReconciler_ensureStatefulSet_ReturnsErrorOnCreateError(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+	}
+
+	mockKM := &mockKubernetesManager{
+		FetchStatefulsetsFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
+			return nil, nil, apierrors.NewNotFound(appsv1.Resource("statefulset"), "redis-cluster-master")
+		},
+		CreateStatefulsetsFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
+			return nil, nil, fmt.Errorf("create error")
+		},
+	}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mockKM,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	gotMaster, gotReplicas, result, err := r.ensureStatefulSet(context.TODO(), logger, redisCluster)
+	assert.Error(t, err)
+	assert.Nil(t, gotMaster)
+	assert.Nil(t, gotReplicas)
+	assert.Equal(t, 30*time.Second, result.RequeueAfter)
+}
+
+func TestRedisClusterReconciler_ensureStatefulSet_SetsOwnerReference(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+			UID:       "12345",
+		},
+	}
+
+	masterSS := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster-master",
+			Namespace: "default",
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: func() *int32 { i := int32(3); return &i }(),
+		},
+	}
+	replicaSS := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster-replica",
+			Namespace: "default",
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: func() *int32 { i := int32(3); return &i }(),
+		},
+	}
+
+	fetchCount := 0
+	updateCalled := 0
+
+	mockKM := &mockKubernetesManager{
+		FetchStatefulsetsFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error) {
+			fetchCount++
+			return masterSS, []*appsv1.StatefulSet{replicaSS}, nil
+		},
+		UpdateResourceFunc: func(ctx context.Context, obj client.Object) error {
+			updateCalled++
+			return nil
+		},
+	}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mockKM,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	gotMaster, gotReplicas, result, err := r.ensureStatefulSet(context.TODO(), logger, redisCluster)
+	assert.NoError(t, err)
+	assert.Equal(t, masterSS, gotMaster)
+	assert.Equal(t, []*appsv1.StatefulSet{replicaSS}, gotReplicas)
+	assert.Equal(t, 0*time.Second, result.RequeueAfter)
+	assert.True(t, updateCalled > 0)
+}
+func TestRedisClusterReconciler_ensureService_CreatesServiceIfNotFound(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+	}
+
+	calledCreate := false
+	mockKM := &mockKubernetesManager{
+		FetchServiceFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.Service, error) {
+			return nil, apierrors.NewNotFound(corev1.Resource("service"), "redis-cluster")
+		},
+		CreateServiceFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.Service, error) {
+			calledCreate = true
+			return &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      rc.Name,
+					Namespace: rc.Namespace,
+				},
+			}, nil
+		},
+	}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mockKM,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	result, err := r.ensureService(context.TODO(), logger, redisCluster)
+	assert.NoError(t, err)
+	assert.True(t, calledCreate)
+	assert.Equal(t, 5*time.Second, result.RequeueAfter)
+}
+
+func TestRedisClusterReconciler_ensureService_ReturnsErrorOnFetchError(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+	}
+
+	mockKM := &mockKubernetesManager{
+		FetchServiceFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.Service, error) {
+			return nil, fmt.Errorf("unexpected error")
+		},
+	}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mockKM,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	result, err := r.ensureService(context.TODO(), logger, redisCluster)
+	assert.Error(t, err)
+	assert.Equal(t, 30*time.Second, result.RequeueAfter)
+}
+
+func TestRedisClusterReconciler_ensureService_ReturnsErrorOnCreateError(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+	}
+
+	mockKM := &mockKubernetesManager{
+		FetchServiceFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.Service, error) {
+			return nil, apierrors.NewNotFound(corev1.Resource("service"), "redis-cluster")
+		},
+		CreateServiceFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.Service, error) {
+			return nil, fmt.Errorf("create error")
+		},
+	}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mockKM,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	result, err := r.ensureService(context.TODO(), logger, redisCluster)
+	assert.Error(t, err)
+	assert.Equal(t, 30*time.Second, result.RequeueAfter)
+}
+
+func TestRedisClusterReconciler_ensureService_SetsOwnerReferenceIfServiceExists(t *testing.T) {
+	s := scheme.Scheme
+	_ = cachev1alpha1.AddToScheme(s)
+
+	redisCluster := &cachev1alpha1.RedisCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+			UID:       "12345",
+		},
+	}
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-cluster",
+			Namespace: "default",
+		},
+	}
+
+	updateCalled := false
+	mockKM := &mockKubernetesManager{
+		FetchServiceFunc: func(ctx context.Context, rc *cachev1alpha1.RedisCluster) (*corev1.Service, error) {
+			return service, nil
+		},
+		UpdateResourceFunc: func(ctx context.Context, obj client.Object) error {
+			updateCalled = true
+			return nil
+		},
+	}
+
+	r := &RedisClusterReconciler{
+		KubernetesManager: mockKM,
+		Scheme:            s,
+	}
+
+	logger := logr.Discard()
+	result, err := r.ensureService(context.TODO(), logger, redisCluster)
+	assert.NoError(t, err)
+	assert.True(t, updateCalled)
+	assert.Equal(t, time.Duration(0), result.RequeueAfter)
 }
