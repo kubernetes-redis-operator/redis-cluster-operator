@@ -50,18 +50,20 @@ type RedisClusterSpec struct {
 type ClusterStateType string
 
 const (
+	// ClusterStateInitializing indicates that the cluster is in the process of being initialized.
+	ClusterStateInitializing ClusterStateType = "Initializing"
 	// ClusterStateNormal indicates that the cluster is in a normal operational state.
-	ClusterStateNormal            ClusterStateType = "Normal"
+	ClusterStateNormal ClusterStateType = "Normal"
 	// ClusterStateScalingOut indicates that the cluster is currently scaling out (adding nodes).
-	ClusterStateScalingOut        ClusterStateType = "ScalingOut"
+	ClusterStateScalingOut ClusterStateType = "ScalingOut"
 	// ClusterStateScalingIn indicates that the cluster is currently scaling in (removing nodes).
-	ClusterStateScalingIn         ClusterStateType = "ScalingIn"
+	ClusterStateScalingIn ClusterStateType = "ScalingIn"
 	// ClusterStateIncreasingReplicas indicates that the cluster is currently increasing the number of replicas.
 	ClusterStateIncreasingReplicas ClusterStateType = "IncreasingReplicas"
 	// ClusterStateDecreasingReplicas indicates that the cluster is currently decreasing the number of replicas.
 	ClusterStateDecreasingReplicas ClusterStateType = "DecreasingReplicas"
 	// ClusterStateUpgradingVersion indicates that the cluster is currently upgrading its version.
-	ClusterStateUpgradingVersion  ClusterStateType = "UpgradingVersion"
+	ClusterStateUpgradingVersion ClusterStateType = "UpgradingVersion"
 )
 
 // RedisClusterStatus defines the observed state of RedisCluster

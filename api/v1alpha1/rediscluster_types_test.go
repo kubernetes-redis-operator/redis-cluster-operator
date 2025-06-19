@@ -41,28 +41,28 @@ port 6379
 }
 
 func TestSetInOperationCondition(t *testing.T) {
-    status := &RedisClusterStatus{}
+	status := &RedisClusterStatus{}
 
-    // Set InOperation to true
-    status.SetInOperationCondition(true, "Scaling", "Cluster is scaling out")
-    cond := status.GetInOperationCondition()
-    assert.NotNil(t, cond, "Condition should not be nil after setting")
-    assert.Equal(t, "InOperation", cond.Type)
-    assert.Equal(t, metav1.ConditionTrue, cond.Status)
-    assert.Equal(t, "Scaling", cond.Reason)
-    assert.Equal(t, "Cluster is scaling out", cond.Message)
+	// Set InOperation to true
+	status.SetInOperationCondition(true, "Scaling", "Cluster is scaling out")
+	cond := status.GetInOperationCondition()
+	assert.NotNil(t, cond, "Condition should not be nil after setting")
+	assert.Equal(t, "InOperation", cond.Type)
+	assert.Equal(t, metav1.ConditionTrue, cond.Status)
+	assert.Equal(t, "Scaling", cond.Reason)
+	assert.Equal(t, "Cluster is scaling out", cond.Message)
 
-    // Set InOperation to false
-    status.SetInOperationCondition(false, "Idle", "Cluster is idle")
-    cond = status.GetInOperationCondition()
-    assert.NotNil(t, cond, "Condition should not be nil after setting to false")
-    assert.Equal(t, metav1.ConditionFalse, cond.Status)
-    assert.Equal(t, "Idle", cond.Reason)
-    assert.Equal(t, "Cluster is idle", cond.Message)
+	// Set InOperation to false
+	status.SetInOperationCondition(false, "Idle", "Cluster is idle")
+	cond = status.GetInOperationCondition()
+	assert.NotNil(t, cond, "Condition should not be nil after setting to false")
+	assert.Equal(t, metav1.ConditionFalse, cond.Status)
+	assert.Equal(t, "Idle", cond.Reason)
+	assert.Equal(t, "Cluster is idle", cond.Message)
 }
 
 func TestGetInOperationCondition_Empty(t *testing.T) {
-    status := &RedisClusterStatus{}
-    cond := status.GetInOperationCondition()
-    assert.Nil(t, cond, "Condition should be nil if not set")
+	status := &RedisClusterStatus{}
+	cond := status.GetInOperationCondition()
+	assert.Nil(t, cond, "Condition should be nil if not set")
 }

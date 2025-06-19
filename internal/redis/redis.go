@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
+	"github.com/redis/go-redis/v9"
 	v1 "k8s.io/api/core/v1"
 )
 
