@@ -12,15 +12,16 @@ import (
 // --- Mock for IKubernetesManager ---
 
 type mockKubernetesManager struct {
-	FetchRedisPodsFunc        func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*corev1.PodList, error)
-	FetchConfigmapFunc        func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*corev1.ConfigMap, error)
-	CreateConfigMapFunc       func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*corev1.ConfigMap, error)
-	FetchServiceFunc          func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*corev1.Service, error)
-	CreateServiceFunc         func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*corev1.Service, error)
-	FetchRedisClusterFunc     func(ctx context.Context, namespacedName client.ObjectKey) (*cachev1alpha1.RedisCluster, error)
-	UpdateResourceFunc        func(ctx context.Context, obj client.Object) error
-	FetchStatefulsetsFunc     func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error)
-	CreateStatefulsetsFunc    func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error)
+	FetchRedisPodsFunc       func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*corev1.PodList, error)
+	FetchConfigmapFunc       func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*corev1.ConfigMap, error)
+	CreateConfigMapFunc      func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*corev1.ConfigMap, error)
+	FetchServiceFunc         func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*corev1.Service, error)
+	CreateServiceFunc        func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*corev1.Service, error)
+	FetchRedisClusterFunc    func(ctx context.Context, namespacedName client.ObjectKey) (*cachev1alpha1.RedisCluster, error)
+	UpdateResourceFunc       func(ctx context.Context, obj client.Object) error
+	UpdateResourceStatusFunc func(ctx context.Context, obj client.Object) error
+	FetchStatefulsetsFunc    func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error)
+	CreateStatefulsetsFunc   func(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error)
 }
 
 func (m *mockKubernetesManager) FetchRedisPods(ctx context.Context, cluster *cachev1alpha1.RedisCluster) (*corev1.PodList, error) {
@@ -68,6 +69,13 @@ func (m *mockKubernetesManager) FetchRedisCluster(ctx context.Context, namespace
 func (m *mockKubernetesManager) UpdateResource(ctx context.Context, obj client.Object) error {
 	if m.UpdateResourceFunc != nil {
 		return m.UpdateResourceFunc(ctx, obj)
+	}
+	return nil
+}
+
+func (m *mockKubernetesManager) UpdateResourceStatus(ctx context.Context, obj client.Object) error {
+	if m.UpdateResourceStatusFunc != nil {
+		return m.UpdateResourceStatusFunc(ctx, obj)
 	}
 	return nil
 }

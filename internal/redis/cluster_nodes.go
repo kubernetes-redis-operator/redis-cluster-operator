@@ -287,6 +287,19 @@ func (c *ClusterNodes) BalanceSlots(ctx context.Context, cluster *v1alpha1.Redis
 	return nil
 }
 
+func (c *ClusterNodes) DrainNodes(ctx context.Context, cluster *v1alpha1.RedisCluster) error {
+	slotMoves := c.CalculateRemoveNodes(ctx, cluster)
+	for _, slotMove := range slotMoves {
+		for _, slot := range slotMove.Slots {
+			err := c.MoveSlot(ctx, slotMove.Source, slotMove.Destination, int(slot))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 type slotMoveMap struct {
 	Source      *Node
 	Destination *Node

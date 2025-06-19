@@ -22,12 +22,13 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/go-redis/redis/v8"
-	redis_internal "github.com/kubernetes-redis-operator/redis-cluster-operator/internal/redis"
+	redisinternal "github.com/kubernetes-redis-operator/redis-cluster-operator/internal/redis"
 	"github.com/kubernetes-redis-operator/redis-cluster-operator/internal/utils"
+	"github.com/redis/go-redis/v9"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
@@ -94,81 +95,62 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return result, err
 	}
 	//endregion
-
-	//region Check if cluster needs to be scaled out
-	scaleOut := false
-	replicas := redisCluster.Spec.Masters
-	// First check if master statefulset needs to be scaled out
-	if *masterSSet.Spec.Replicas < redisCluster.Spec.Masters {
-		scaleOut = true
-		// The statefulset has less replicas than are needed for the cluster.
-		// This means the user is trying to scale up the cluster, and we need to scale up the statefulset
-		// and let the reconciliation take care of stabilising the cluster.
-		logger.Info("Scaling up statefulset for Redis Cluster")
-		masterSSet.Spec.Replicas = &replicas
-		err = r.KubernetesManager.UpdateResource(ctx, masterSSet)
+	clusterNodes := redisinternal.ClusterNodes{}
+	if redisCluster.Status.GetInOperationCondition() == nil {
+		// If the cluster is not in operation, we should set the in operation condition to false.
+		logger.Info("Cluster is initializing.")
+		redisCluster.Status.ClusterState = redisclusterv1alpha1.ClusterStateInitializing
+		redisCluster.Status.SetInOperationCondition(true, "ClusterStateInitializing", "Cluster is initializing state")
+		err = r.KubernetesManager.UpdateResourceStatus(ctx, redisCluster)
 		if err != nil {
-			return r.RequeueError(ctx, "Could not update statefulset replicas", err)
+			return r.RequeueError(ctx, "Could not update RedisCluster condition", err)
 		}
 	}
-	for _, statefulset := range replSSets {
-		if *statefulset.Spec.Replicas < redisCluster.Spec.Masters {
-			statefulset.Spec.Replicas = &replicas
-			err = r.KubernetesManager.UpdateResource(ctx, statefulset)
-			if err != nil {
-				return r.RequeueError(ctx, "Could not update statefulset replicas", err)
+	if redisCluster.Status.GetInOperationCondition().Status == metav1.ConditionTrue {
+		// If the cluster is in operation, we should ensure that the operation is running correctly.
+		logger.Info("Cluster is in operation. Reconciliation will check for the operation to complete.")
+		switch redisCluster.Status.ClusterState {
+		case redisclusterv1alpha1.ClusterStateScalingOut:
+			// If the cluster is scaling out, we should ensure that the statefulset is scaled out correctly.
+			result, err = r.reconcileScaleCluster(ctx, logger, redisCluster, masterSSet, replSSets)
+			if err != nil || result.RequeueAfter > 0 {
+				return result, err
 			}
-		}
-	}
-	if scaleOut {
-		// We've successfully updated the replicas for all statefulsets.
-		// Now we can wait for the pods to come up and then continue on the
-		// normal process for stabilising the Redis Cluster
-		logger.Info("Scaling out statefulset for Redis Cluster successful. Reconciling again in 5 seconds.")
-		return ctrl.Result{
-			RequeueAfter: 5 * time.Second,
-		}, nil
-	}
-
-	//endregion
-
-	//region Check if cluster needs to be scaled in
-	scaleIn := false
-	// First we have to rebalance the masters if we have to scale in
-
-	for _, statefulset := range replSSets {
-		if *statefulset.Spec.Replicas > redisCluster.Spec.Masters {
-			// The statefulset has less replicas than are needed for the cluster.
-			// This means the user is trying to scale up the cluster, and we need to scale up the statefulset
-			// and let the reconciliation take care of stabilising the cluster.
-			logger.Info("Scaling up statefulset for Redis Cluster")
-			statefulset.Spec.Replicas = &replicas
-			err = r.KubernetesManager.UpdateResource(ctx, statefulset)
-			if err != nil {
-				return r.RequeueError(ctx, "Could not update statefulset replicas", err)
+		case redisclusterv1alpha1.ClusterStateScalingIn:
+			clusterNodes.DrainNodes(ctx, redisCluster)
+			// If the cluster is scaling in, we should ensure that the statefulset is scaled in correctly.
+			result, err = r.reconcileScaleCluster(ctx, logger, redisCluster, masterSSet, replSSets)
+			if err != nil || result.RequeueAfter > 0 {
+				return result, err
 			}
+		case redisclusterv1alpha1.ClusterStateIncreasingReplicas:
+			// If the cluster is increasing replicas, we should ensure that the statefulset is updated correctly.
+		case redisclusterv1alpha1.ClusterStateDecreasingReplicas:
+			// If the cluster is decreasing replicas, we should ensure that the statefulset is updated correctly.
+		case redisclusterv1alpha1.ClusterStateNormal:
+			// If the cluster state is normal, there should be no operation in progress.
+			logger.Info("Cluster is in normal state, but still marked as in operation. This should not happen. Resetting operation condition.")
+			redisCluster.Status.SetInOperationCondition(false, "ClusterStateNormal", "Cluster is in normal state")
+			err = r.KubernetesManager.UpdateResourceStatus(ctx, redisCluster)
+			if err != nil {
+				return r.RequeueError(ctx, "Could not update RedisCluster status", err)
+			}
+			// Reconcile the cluster again to check if a new operation is needed.
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
+	} else {
+		// If the cluster is not in operation, we can check the spec and compare it to the current state of the cluster to decide whether we need an operation.
+		logger.Info("Cluster is not in operation. Continuing with reconciliation to check for potential operations.")
 	}
-	if scaleIn {
-		// We've successfully updated the replicas for all statefulsets.
-		// Now we can wait for the pods to come up and then continue on the
-		// normal process for stabilising the Redis Cluster
-		logger.Info("Scaling in statefulset for Redis Cluster successful. Reconciling again in 5 seconds.")
-		return ctrl.Result{
-			RequeueAfter: 5 * time.Second,
-		}, nil
-	}
-	//endregion
 
 	pods, err := r.KubernetesManager.FetchRedisPods(ctx, redisCluster)
 	if err != nil {
 		return r.RequeueError(ctx, "Could not fetch pods for redis cluster", err)
 	}
 
-	clusterNodes := redis_internal.ClusterNodes{}
 	for _, pod := range pods.Items {
 		if utils.IsPodReady(&pod) {
-			node, err := redis_internal.NewNode(ctx, &redis.Options{
+			node, err := redisinternal.NewNode(ctx, &redis.Options{
 				Addr: pod.Status.PodIP + ":6379",
 			}, &pod, redis.NewClient)
 			if err != nil {
@@ -260,6 +242,15 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		logger.Info("Finished balancing Redis Cluster slots")
 	}
 
+	redisCluster.Status.ClusterState = redisclusterv1alpha1.ClusterStateNormal
+	redisCluster.Status.SetInOperationCondition(false, "ClusterStateNormal", "Cluster is in normal state")
+	err = r.KubernetesManager.UpdateResourceStatus(ctx, redisCluster)
+	if err != nil {
+		return r.RequeueError(ctx, "Could not update RedisCluster status", err)
+	}
+
+	logger.Info("Reconciliation completed successfully for RedisCluster", "cluster", req.Name, "namespace", req.Namespace)
+	// Return a result to requeue the reconciliation after 30 seconds
 	return ctrl.Result{
 		RequeueAfter: 30 * time.Second,
 	}, nil
@@ -473,4 +464,26 @@ func (r *RedisClusterReconciler) ensureService(ctx context.Context, logger logr.
 		}, err
 	}
 	return ctrl.Result{}, nil
+}
+
+// reconcileScaleOut checks if the cluster needs to be scaled out and performs the scaling if necessary.
+func (r *RedisClusterReconciler) reconcileScaleCluster(ctx context.Context, logger logr.Logger, redisCluster *redisclusterv1alpha1.RedisCluster, masterSSet *appsv1.StatefulSet, replSSets []*appsv1.StatefulSet) (ctrl.Result, error) {
+	replicas := redisCluster.Spec.Masters
+	masterSSet.Spec.Replicas = &replicas
+	err := r.KubernetesManager.UpdateResource(ctx, masterSSet)
+	if err != nil {
+		return r.RequeueError(ctx, "Could not update statefulset replicas", err)
+	}
+	for _, statefulset := range replSSets {
+		if *statefulset.Spec.Replicas < redisCluster.Spec.Masters {
+			statefulset.Spec.Replicas = &replicas
+			err := r.KubernetesManager.UpdateResource(ctx, statefulset)
+			if err != nil {
+				return r.RequeueError(ctx, "Could not update statefulset replicas", err)
+			}
+		}
+	}
+	return ctrl.Result{
+		RequeueAfter: 5 * time.Second,
+	}, nil
 }

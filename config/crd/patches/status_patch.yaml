@@ -2,4 +2,4 @@
 
 - op: add
   path: /spec/versions/0/schema/openAPIV3Schema/properties/status/properties/clusterState/enum
-  value: ["Normal", "ScalingOut", "ScalingIn", "IncreasingReplicas", "DecreasingReplicas", "UpgradingVersion"]
+  value: ["Initializing", "Normal", "ScalingOut", "ScalingIn", "IncreasingReplicas", "DecreasingReplicas", "UpgradingVersion"]

@@ -20,6 +20,7 @@ type IKubernetesManager interface {
 	CreateService(ctx context.Context, cluster *v1alpha1.RedisCluster) (*v1.Service, error)
 	FetchRedisCluster(ctx context.Context, namespacedName types.NamespacedName) (*redisclusterv1alpha1.RedisCluster, error)
 	UpdateResource(ctx context.Context, obj client.Object) error
+	UpdateResourceStatus(ctx context.Context, obj client.Object) error
 	FetchStatefulsets(ctx context.Context, cluster *v1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error)
 	CreateStatefulsets(ctx context.Context, cluster *v1alpha1.RedisCluster) (*appsv1.StatefulSet, []*appsv1.StatefulSet, error)
 }

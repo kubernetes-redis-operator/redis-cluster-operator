@@ -1,0 +1,25 @@
+apiVersion: rediscluster.kuro.io/v1alpha1
+kind: RedisCluster
+metadata:
+  name: rdcl1
+  namespace: default
+spec:
+  masters: 3
+  replicasPerMaster: 1
+  podSpec:
+    containers:
+      - name: redis
+        image: redis:8.0.2-alpine
+        resources:
+          requests:
+            cpu: "0.1"
+            memory: 100Mi
+          limits:
+            cpu: "0.2"
+            memory: 200Mi
+  config: |
+    maxmemory 200mb
+    maxmemory-samples 5
+    maxmemory-policy allkeys-lru
+    appendonly yes
+    protected-mode no

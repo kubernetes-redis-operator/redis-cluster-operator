@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
 	cachev1alpha1 "github.com/kubernetes-redis-operator/redis-cluster-operator/api/v1alpha1"
 	"github.com/kubernetes-redis-operator/redis-cluster-operator/internal/kubernetes"
 	"github.com/stretchr/testify/assert"
@@ -38,14 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
-
-type mockKubernetes struct {
-	fetchRedisPodsFunc func(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*corev1.PodList, error)
-}
-
-func (m *mockKubernetes) FetchRedisPods(ctx context.Context, kubeClient client.Client, cluster *v1alpha1.RedisCluster) (*corev1.PodList, error) {
-	return m.fetchRedisPodsFunc(ctx, kubeClient, cluster)
-}
 
 func TestRedisClusterReconciler_Reconcile_ReturnsIfRedisClusterIsNotFound(t *testing.T) {
 	// Register operator types with the runtime scheme.
